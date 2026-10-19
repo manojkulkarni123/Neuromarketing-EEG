@@ -1,0 +1,15 @@
+# Isolated environment for the neuromarketing (PsychoPy + LSL + MNE) pipeline.
+# See CLAUDE.md for why this is separate from the machine's global Python install.
+# Versions intentionally unpinned for psychopy/mne -- let pip's resolver pick
+# compatible versions; this venv is isolated so there's no risk to anything else.
+
+psychopy
+pylsl
+pyxdf
+mne
+opencv-python
+numpy
+scipy
+scikit-learn
+matplotlib
+pandas

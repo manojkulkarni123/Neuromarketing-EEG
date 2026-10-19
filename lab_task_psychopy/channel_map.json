@@ -1,0 +1,8 @@
+{
+  "channel_order": ["Fp1", "Fp2", "F7", "F3", "Fz", "F4", "F8", "T3", "C3", "Cz",
+                    "C4", "T4", "T5", "P3", "Pz", "P4", "T6", "O1", "O2",
+                    "AUX20", "AUX21", "AUX22", "AUX23", "AUX24", "AUX25", "AUX26", "FLAT27"],
+  "source_edf": "260929_000005_EEG.edf",
+  "method": "calibrate_channels.py correlation vs EEGStudio's labeled EDF export (2026-09-29), confirmed by tap test (O1 -> slot 18)",
+  "notes": "Auto-save was blocked only because F3 and F8 had no scalp contact during calibration (both recorded identical noise, r=0.94 with each other and with the unconnected AUX slots). Slot 7 = F8 by display-order position. Posterior slots (T5, P3, P4, O1, O2) matched their own labels but weakly (r=0.46-0.62) -- poor contact at the back of the head, not a mapping error. Valid for 'Raw data (in uV)' mode (27 channels) only."
+}

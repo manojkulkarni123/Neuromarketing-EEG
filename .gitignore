@@ -1,0 +1,38 @@
+# Allowlist: ignore everything, then un-ignore only what belongs in this repo.
+# Keeps participant EEG recordings, ad videos, the venv, and unrelated
+# reconstruction work from ever being committed by accident.
+/*
+!/.gitignore
+!/README.md
+!/requirements.txt
+
+!/lab_task_psychopy/
+/lab_task_psychopy/*
+!/lab_task_psychopy/*.py
+!/lab_task_psychopy/channel_map.json
+
+!/pipeline/
+/pipeline/*
+!/pipeline/preprocess_mne.py
+!/pipeline/extract_neuromarketing_features.py
+!/pipeline/edf_reader.py
+!/pipeline/analyze_alpha_blocking.py
+
+!/lab_task/
+/lab_task/*
+!/lab_task/preference_task.py
+!/lab_task/random_dot_task.py
+!/lab_task/align_sync.py
+
+!/data/
+/data/*
+!/data/lab_session/
+/data/lab_session/*
+!/data/lab_session/pilot01_ads_ratings.csv
+!/data/lab_session/pilot01_ads_raw_engagement_timeline.png
+!/data/lab_session/ads/
+/data/lab_session/ads/*
+!/data/lab_session/ads/ad_name_map.csv
+
+__pycache__/
+*.pyc
