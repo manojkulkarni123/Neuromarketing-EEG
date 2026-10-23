@@ -87,8 +87,12 @@ def _drop_flat_channels(raw):
     return raw
 
 
-DEAD_CORR = 0.9       # |r| with an unconnected AUX input above this = electrode picks up only ambient noise
-MAX_STD_UV = 500.0    # real dry-cap EEG after 1-40Hz filtering sits ~15-60uV; far above this = no contact
+# Thresholds set from real sessions on this dry cap. In test1 (2026-10-19), electrodes
+# with confirmed good contact read 26-52uV (Fz, Cz, Fp1, Fp2, C3, C4, F4); Pz (466uV,
+# r_aux=0.86) and O2 (404uV) passed the old 500uV / 0.9 limits, yet the eyes-closed
+# check showed no alpha increase at all on them -- i.e. no real brain signal.
+DEAD_CORR = 0.8       # |r| with an unconnected AUX input above this = electrode picks up mostly ambient noise
+MAX_STD_UV = 150.0    # good dry-cap channels sit ~25-100uV after 1-40Hz filtering
 
 
 def quality_check(raw):

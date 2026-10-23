@@ -23,10 +23,10 @@ python -m venv .venv
 1. In EEGStudio: start acquisition, turn **LSL Outlet** on, check electrode contact.
 2. Put ad videos in `data/lab_session/ads/` (simple names like `ad01.mp4`: spaces
    or brackets in filenames break PsychoPy's video playback).
-3. Record (set `PARTICIPANT_ID` at the top of the script first):
+3. Record (a new `--id` per participant; it refuses to overwrite an existing session):
    ```
-   .venv\Scripts\python.exe lab_task_psychopy\ad_viewing_task.py        # all ads, shuffled per participant
-   .venv\Scripts\python.exe lab_task_psychopy\ad_viewing_task.py --one  # quick test, one ad
+   .venv\Scripts\python.exe lab_task_psychopy\ad_viewing_task.py --id p01        # all ads, shuffled per participant
+   .venv\Scripts\python.exe lab_task_psychopy\ad_viewing_task.py --id test1 --one  # quick test, one ad
    ```
    Saves `data/lab_session/<id>_raw.fif` (EEG + AD_START/AD_END markers on one
    LSL clock) and `<id>_ratings.csv`.

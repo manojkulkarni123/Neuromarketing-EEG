@@ -5,6 +5,8 @@
 !/.gitignore
 !/README.md
 !/requirements.txt
+!/NEUROMARKETING_PROJECT_GUIDE.md
+!/Review2_Neuromarketing_EEG.pptx
 
 !/lab_task_psychopy/
 /lab_task_psychopy/*
@@ -17,6 +19,7 @@
 !/pipeline/extract_neuromarketing_features.py
 !/pipeline/edf_reader.py
 !/pipeline/analyze_alpha_blocking.py
+!/pipeline/build_replay.py
 
 !/lab_task/
 /lab_task/*
@@ -30,6 +33,8 @@
 /data/lab_session/*
 !/data/lab_session/pilot01_ads_ratings.csv
 !/data/lab_session/pilot01_ads_raw_engagement_timeline.png
+!/data/lab_session/test1_ratings.csv
+!/data/lab_session/test1_raw_engagement_timeline.png
 !/data/lab_session/ads/
 /data/lab_session/ads/*
 !/data/lab_session/ads/ad_name_map.csv
