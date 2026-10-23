@@ -13,6 +13,9 @@ answers, and where in the ad engagement rises or falls, which a questionnaire
 alone cannot show. Everything runs on a low-cost 19-channel dry-electrode cap
 and our own Python software.
 
+The stimuli are **five existing real TV ads** (32–90 s). We did not use any
+AI-generated ads, A/B ad versions, or end-of-session memory/choice tests.
+
 ## How we got here
 
 1. **Review 1 — decoding decisions.** We rebuilt a published EEG study
