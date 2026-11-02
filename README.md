@@ -2,6 +2,7 @@
 
 BMS College of Engineering, CSE major project. Guide: Prof. Amit Pradhan.
 Team: Siddhant Sawhney, Manoj Kulkarni, Pranav Easwar, Padma Deepak.
+Industry collaboration: the EEG amplifier and cap were provided by ITIE Knowledge Solutions.
 
 ## What we did, in one paragraph
 

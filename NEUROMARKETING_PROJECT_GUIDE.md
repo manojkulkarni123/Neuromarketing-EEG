@@ -124,6 +124,8 @@ are mostly unpublished, company-run analyses, so careful academic work is useful
 ## 5. Hardware and software
 
 ### Hardware
+- **Source:** the amplifier, cap and EEGStudio software were provided by
+  **ITIE Knowledge Solutions** (industry collaboration).
 - **Amplifier:** Mitsar
 - **Cap:** **SmartDRY 19-channel dry-electrode cap**. No gel: electrodes press
   through the hair onto the scalp. Quick to set up, but noisier than gel, and
