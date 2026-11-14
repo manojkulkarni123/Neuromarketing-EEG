@@ -39,17 +39,20 @@ STEP_S = 1.0
 
 # FAA uses ONE homologous left/right pair: the first pair in this list where
 # both electrodes are present and not marked bad. Never mixes pairs or averages
-# a bad electrode in -- with this cap F3 is dead (and F8 was during
-# calibration), and an earlier version averaged F3 into "left" regardless.
+# a bad electrode in -- F3 was dead in the first recordings (good again from p01,
+# 2026-11-13), F8 is always dead, and an earlier version averaged F3 into "left" regardless.
 # F7/F8 is an established FAA pair in its own right; Fp1/Fp2 is a weaker last
 # resort (more eye-movement contamination, leans on ICA) -- disclose whichever
 # pair was used in the paper.
 FAA_PAIRS = [("F3", "F4"), ("F7", "F8"), ("Fp1", "Fp2")]
 
-# Permanently dead on our SmartDRY cap (no scalp contact, confirmed in calibration
-# and the pilot). Always excluded, so an automatic-detection miss can't let them
-# into ICA or the features. --bad adds to this list.
-KNOWN_BAD = ["F3", "F8"]
+# Dead on our SmartDRY cap in every recording so far (no scalp contact). Always
+# excluded, so an automatic-detection miss can't let it into ICA or the features.
+# --bad adds to this list. F8 has matched an unconnected input in every recording (r >= 0.94).
+# F3 was here too until 2026-11-13: dead in pilot01/test1 (r_aux = 1.00) but GOOD in p01
+# (18.6 uV, r_aux 0.28, r = +0.69 with Fz) -- so it is now left to the per-session
+# quality_check(), which flags it automatically whenever it is dead again.
+KNOWN_BAD = ["F8"]
 
 # Posterior alpha suppression: alpha over visual cortex drops when people look
 # closely at something. First choice O1/O2/Pz; P3/P4 used only if none of those work.

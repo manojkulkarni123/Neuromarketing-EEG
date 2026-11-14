@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home · Ad Copilot</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/shell.js"></script>
+<style>
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px; }
+@media (max-width: 900px) { .steps { grid-template-columns: 1fr; } }
+.stp { padding: 18px; display: flex; flex-direction: column; gap: 8px; }
+.stp .n { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.stp .big { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stp p { margin: 0; color: var(--ink-2); flex: 1; }
+.next { padding: 16px 18px; display: flex; align-items: center; gap: 14px; margin-bottom: 20px; background: var(--accent-weak); border-color: transparent; }
+.next b { font-size: 14px; } .next span { color: var(--ink-2); }
+.cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+.rowi { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-top: 1px solid var(--line); text-decoration: none; color: inherit; }
+.rowi:hover { background: var(--surface-2); } .rowi img { width: 64px; aspect-ratio: 16/9; object-fit: cover; border-radius: 4px; background: #000; }
+.rowi .t { flex: 1; min-width: 0; } .rowi .t b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+</style>
+</head>
+<body>
+<div class="pagehead"><h1>Home</h1><span class="sub">Understand how viewers' brains respond to a video ad, scene by scene.</span></div>
+<div class="page">
+  <section class="card next" id="next"></section>
+  <div class="steps">
+    <section class="card stp"><span class="n">1 · Ads</span><span class="big" id="nAds">–</span><p>Add a video. AI splits it into scenes and finds every brand moment; you check and approve.</p><a class="btn" href="/ads">Open ads</a></section>
+    <section class="card stp"><span class="n">2 · Record</span><span class="big" id="nView">–</span><p>Check the cap, then record a viewer's brain activity while they watch.</p><a class="btn" href="/record">Record a viewer</a></section>
+    <section class="card stp"><span class="n">3 · Results</span><span class="big" id="nRes">–</span><p>See the ad with the brain response under it, the takeaways, and ask the copilot.</p><a class="btn primary" href="/results">Open results</a></section>
+  </div>
+  <div class="cols">
+    <section class="card"><div class="card-h"><h2>Ads</h2></div><div id="adList"></div></section>
+    <section class="card"><div class="card-h"><h2>Viewers</h2></div><div id="viewList"></div></section>
+  </div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+(async () => {
+  const [setup, sessions] = await Promise.all([fetch("/api/setup").then(r => r.json()), fetch("/api/sessions").then(r => r.json())]);
+  const ads = setup.ads, views = sessions.filter(v => !/^zz_|^e2e/.test(v.session));
+  const ok = views.filter(v => !v.excluded && v.ads.length), count = {};
+  ok.forEach(v => v.ads.forEach(a => count[a] = (count[a] || 0) + 1));
+  const todoLabel = ads.filter(a => !a.scenes_status), todoReview = ads.filter(a => a.scenes_status && a.scenes_status !== "reviewed"), todoAn = views.filter(v => !v.processed && !v.excluded);
+  $("nAds").textContent = `${ads.length} videos`; $("nView").textContent = `${ok.length} viewer${ok.length === 1 ? "" : "s"}`; $("nRes").textContent = `${Object.keys(count).length} ads with data`;
+  const nx = todoLabel.length ? [`${todoLabel.length} video${todoLabel.length > 1 ? "s are" : " is"} not analysed yet`, "Let the AI find the scenes and brand moments.", "/ads", "Go to ads"]
+    : todoAn.length ? [`${todoAn.length} recording${todoAn.length > 1 ? "s" : ""} waiting to be analysed`, todoAn.map(v => v.session).join(", "), "/record", "Go to record"]
+    : todoReview.length ? [`${todoReview.length} ad${todoReview.length > 1 ? "s have" : " has"} scenes that need your review`, todoReview.map(a => a.brand || a.ad).join(", "), `/review?ad=${todoReview[0].ad}`, "Review scenes"]
+    : ["Everything is up to date", "Record another viewer, or explore the results.", "/results", "Open results"];
+  $("next").innerHTML = `<div style="flex:1"><b>Next step: ${esc(nx[0])}</b><br><span>${esc(nx[1])}</span></div><a class="btn primary" href="${nx[2]}">${nx[3]}</a>`;
+  $("adList").innerHTML = ads.map(a => `<a class="rowi" href="${a.scenes_status ? "/results?ad=" + a.ad : "/ads"}"><img loading="lazy" src="/api/thumb/${a.ad}?t=${((a.duration_s || 10) * .45).toFixed(1)}&w=160" alt="">
+      <span class="t"><b>${esc(a.brand || a.ad)}</b><span class="small muted">${esc(a.ad)} · ${Math.round(a.duration_s || 0)} s</span></span>
+      <span class="badge ${a.scenes_status === "reviewed" ? "good" : a.scenes_status ? "warn" : "bad"}">${a.scenes_status === "reviewed" ? "approved" : a.scenes_status ? "needs review" : "not analysed"}</span>
+      <span class="badge">${count[a.ad] ? count[a.ad] + " viewer" + (count[a.ad] > 1 ? "s" : "") : "no viewers"}</span></a>`).join("") || '<div class="empty">No videos yet.</div>';
+  $("viewList").innerHTML = views.map(v => `<a class="rowi" href="${v.ads.length && !v.excluded ? "/results?session=" + encodeURIComponent(v.session) + "&ad=" + v.ads[0] : "/record"}">
+      <span class="t"><b>${esc(v.session)}</b><span class="small muted">${v.ads.length ? v.ads.length + " ad" + (v.ads.length > 1 ? "s" : "") + ": " + v.ads.map(esc).join(", ") : v.processed ? "could not be scored" : "recorded, not analysed"}</span></span>
+      <span class="badge ${v.excluded ? "bad" : v.ads.length ? "good" : "warn"}">${v.excluded ? "excluded" : v.ads.length ? "analysed" : v.processed ? "no usable data" : "new"}</span></a>`).join("") || '<div class="empty">No recordings yet.</div>';
+})();
+</script>
+</body>
+</html>

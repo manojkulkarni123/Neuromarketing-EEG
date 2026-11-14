@@ -81,6 +81,10 @@ class LSLRecorder:
         self.ch_labels = self._read_labels(full)
         self._chunks, self._stamps = [], []
         self.markers = []  # (local_clock time, label)
+        # Frame log: one row per screen refresh while a video plays --
+        # (ad name, LSL time just after the flip, video pts of the frame drawn).
+        # Gives an exact video-time -> EEG-time map (dropped/stalled frames included).
+        self.frames = []
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._pull_loop, daemon=True)
         print(f"[recorder] found '{self.name}': {len(self.ch_labels)} ch @ {self.sfreq}Hz, "
@@ -122,6 +126,9 @@ class LSLRecorder:
 
     def mark(self, label):
         self.markers.append((local_clock(), label))
+
+    def log_frame(self, ad, pts, video_fps):
+        self.frames.append((ad, local_clock(), float(pts), float(video_fps)))
 
     def stop(self):
         t_stop = local_clock()
@@ -180,6 +187,8 @@ class LSLRecorder:
         raw.set_annotations(mne.Annotations(onset=idx / sfreq_eff, duration=0,
                                             description=[m[1] for m, k in zip(self.markers, keep) if k]))
         raw.save(out_base + "_raw.fif", overwrite=True, verbose=False)
+        if self.frames:
+            self._save_framelog(out_base, stamps, sfreq_eff)
 
         dropped = [m[1] for m, k in zip(self.markers, keep) if not k]
         print(f"[recorder] saved {n} samples x {data.shape[0]} ch over {span:.1f}s -> {out_base}_raw.fif")
@@ -193,3 +202,33 @@ class LSLRecorder:
         if max_gap_ms > 50:
             print("[recorder] WARNING: a gap >50ms suggests dropped data -- check this session before using it.")
         return out_base + "_raw.fif"
+
+    def _save_framelog(self, out_base, stamps, sfreq_eff):
+        """<base>_framelog.csv: which video frame was on screen at which EEG time.
+
+        rec_time_s is on the same time axis as the .fif (seconds from the first
+        EEG sample, via the per-sample LSL timestamps -- the same mapping the
+        markers use, but interpolated between samples instead of rounded).
+        video_frame = round(pts * fps): PsychoPy/ffpyplayer pts are zero-based
+        (verified 2026-11-13: first frame pts = 0.0), matching the labeller's
+        convention (frame k starts at k / fps). AD_START is sent right after the
+        flip that shows frame 0.
+        """
+        import csv
+        idx = np.arange(len(stamps))
+        first_pts, rows = {}, []
+        for ad, t, pts, vfps in self.frames:
+            first_pts.setdefault(ad, pts)
+            rows.append({
+                "ad": ad, "lsl_time": f"{t:.6f}",
+                "rec_time_s": f"{np.interp(t, stamps, idx) / sfreq_eff:.6f}",
+                "pts": f"{pts:.6f}",
+                "video_frame": int(round(pts * vfps)),
+                "inside_recording": int(stamps[0] <= t <= stamps[-1]),
+            })
+        with open(out_base + "_framelog.csv", "w", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=list(rows[0]))
+            w.writeheader()
+            w.writerows(rows)
+        print(f"[recorder] frame log: {len(rows)} screen refreshes over {len(first_pts)} video(s) "
+              f"-> {out_base}_framelog.csv")

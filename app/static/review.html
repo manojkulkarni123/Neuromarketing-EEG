@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scene editor · Ad Copilot</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/shell.js"></script>
+<style>
+#msg { font-size: 12.5px; color: var(--muted); } #msg.err { color: var(--bad); }
+.ed { display: grid; grid-template-columns: minmax(0, 2.1fr) minmax(320px, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 1100px) { .ed { grid-template-columns: 1fr; } }
+.stage { overflow: hidden; }
+.stage video { width: 100%; max-height: 46vh; aspect-ratio: 16/9; object-fit: contain; background: #000; display: block; }
+.ctrl { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.readout { font-variant-numeric: tabular-nums; font-weight: 600; margin-right: auto; }
+.heard { color: var(--muted); font-size: 12px; padding: 6px 12px; min-height: 28px; border-bottom: 1px solid var(--line); }
+.film { display: flex; height: 54px; background: #000; }
+.film img { flex: 1 1 0; min-width: 0; height: 100%; object-fit: cover; display: block; opacity: .92; }
+#tl { width: 100%; height: 214px; display: block; cursor: crosshair; }
+.legend { display: flex; gap: 6px 16px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); padding: 10px 12px; border-top: 1px solid var(--line); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.panel { display: flex; flex-direction: column; gap: 16px; max-height: calc(100vh - 92px); overflow: auto; }
+.field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.field label { font-size: 11.5px; color: var(--muted); font-weight: 500; }
+.field input, .field textarea { width: 100%; } .field textarea { min-height: 54px; resize: vertical; }
+.roles { display: flex; flex-wrap: wrap; gap: 6px; }
+.roles button { font: inherit; font-size: 12px; padding: 5px 10px; border-radius: 99px; border: 1px solid var(--line-2); background: var(--surface); cursor: pointer; color: var(--ink-2); display: inline-flex; gap: 6px; align-items: center; }
+.roles button i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+.roles button.on { border-color: var(--accent); background: var(--accent-weak); color: var(--accent); font-weight: 600; }
+.acts { display: flex; flex-wrap: wrap; gap: 6px; }
+.todo { display: flex; gap: 10px; align-items: flex-start; padding: 9px 0; border-top: 1px solid var(--line); }
+.todo:first-child { border-top: 0; } .todo .tx { flex: 1; cursor: pointer; } .todo .tx b { display: block; } .todo .tx span { font-size: 12px; color: var(--warn); }
+.brow { padding: 9px 0; border-top: 1px solid var(--line); cursor: pointer; }
+.brow:first-child { border-top: 0; } .brow.sel { background: var(--accent-weak); margin: 0 -16px; padding: 9px 16px; }
+.brow .top { display: flex; gap: 8px; align-items: center; } .brow .top .t { font-variant-numeric: tabular-nums; font-size: 12px; color: var(--muted); margin-left: auto; }
+.brow .edit { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; } .brow .edit input { flex: 1 1 100%; }
+details.card > summary { list-style: none; cursor: pointer; padding: 12px 16px; font-weight: 600; }
+details.card > summary::-webkit-details-marker { display: none; }
+.keys { line-height: 2; }
+</style>
+</head>
+<body>
+<div class="pagehead">
+  <h1>Scene editor</h1>
+  <select id="adSel" aria-label="Ad"></select>
+  <span id="status" class="badge">-</span>
+  <span id="msg"></span>
+  <span class="spacer"></span>
+  <a class="btn ghost" href="/ads">Back to ads</a>
+  <button class="btn ghost" id="helpBtn">Shortcuts</button>
+  <button class="btn" id="undoBtn" title="Ctrl+Z">Undo</button>
+  <button class="btn" id="saveBtn" title="Ctrl+S">Save</button>
+  <button class="btn primary" id="approveBtn">Approve</button>
+</div>
+
+<div class="page">
+  <div class="ed">
+    <section class="card stage">
+      <video id="vid" preload="auto" playsinline></video>
+      <div class="ctrl">
+        <span class="readout" id="readout">-</span>
+        <button class="btn sm" id="prevCut" title="Shift + Left">◀◀ cut</button>
+        <button class="btn sm" id="prevF" title="Left">◀ frame</button>
+        <button class="btn sm primary" id="play" title="Space" style="min-width:64px">Play</button>
+        <button class="btn sm" id="nextF" title="Right">frame ▶</button>
+        <button class="btn sm" id="nextCut" title="Shift + Right">cut ▶▶</button>
+      </div>
+      <div class="heard" id="heard"></div>
+      <div class="film" id="film"></div>
+      <canvas id="tl"></canvas>
+      <div class="legend" id="legend"></div>
+    </section>
+
+    <aside class="panel">
+      <section class="card" id="todoCard">
+        <div class="card-h"><h2>To check</h2><span class="small muted" id="todoCount"></span></div>
+        <div class="card-b" id="todo" style="padding-top:6px;padding-bottom:6px"></div>
+      </section>
+      <section class="card">
+        <div class="card-h"><h2 id="selTitle">Scene</h2><span class="small muted num" id="selTime"></span></div>
+        <div class="card-b">
+          <div class="field"><label for="fLabel">Name</label><input type="text" id="fLabel"></div>
+          <div class="field"><label>Role in the story</label><div class="roles" id="roles"></div></div>
+          <div class="field"><label for="fDesc">What is on screen</label><textarea id="fDesc"></textarea></div>
+          <div class="field"><label for="fAudio">What is heard</label><textarea id="fAudio" style="min-height:40px"></textarea></div>
+          <div class="small muted" id="selMeta" style="margin-bottom:12px"></div>
+          <div class="acts">
+            <button class="btn sm" id="splitBtn" title="S">Split at playhead</button>
+            <button class="btn sm" id="setStart" title="[">Starts at playhead</button>
+            <button class="btn sm" id="setEnd" title="]">Ends at playhead</button>
+            <button class="btn sm" id="mergeBtn">Merge with next</button>
+            <button class="btn sm danger" id="delBtn">Remove</button>
+          </div>
+        </div>
+      </section>
+      <section class="card">
+        <div class="card-h"><h2>Brand moments</h2><button class="btn sm primary" id="addBrand" title="B">Add at playhead</button></div>
+        <div class="card-b" id="brands" style="padding-top:6px;padding-bottom:6px"></div>
+      </section>
+    </aside>
+  </div>
+  <details class="card" style="margin-top:16px"><summary>About this ad · story and full transcript</summary><div class="card-b" id="story"></div></details>
+</div>
+<div class="pop hidden" id="help" style="position:fixed;right:24px;top:64px">
+  <h3>Shortcuts</h3>
+  <div class="keys small"><kbd>Space</kbd> play / pause<br><kbd>←</kbd> <kbd>→</kbd> one frame · <kbd>Shift</kbd> + <kbd>←</kbd> <kbd>→</kbd> previous / next detected cut<br>
+  <kbd>S</kbd> split scene at playhead · <kbd>[</kbd> <kbd>]</kbd> selected scene starts / ends here<br><kbd>B</kbd> add a brand moment · <kbd>Del</kbd> remove selected brand moment<br><kbd>Ctrl</kbd>+<kbd>Z</kbd> undo · <kbd>Ctrl</kbd>+<kbd>S</kbd> save</div>
+  <div class="small muted" style="margin-top:8px">Timeline: click to jump · click a scene or brand bar to select it · drag a scene edge or a brand bar (edges resize). Scene edges snap to detected cuts; hold <kbd>Alt</kbd> to place freely. Changes save automatically as a draft.</div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const vid = $("vid"), cv = $("tl"), ctx = cv.getContext("2d");
+const css = v => getComputedStyle(document.documentElement).getPropertyValue("--" + v).trim();
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+let AD = null, doc = null, cuts = [], AUDIO = null, ROLES = [], KINDS = [], fps = 25, N = 1;
+let sel = 0, selB = -1, undo = [], dirty = false, drag = null, saveTimer = null;
+const KIND_NAME = { logo: "Logo", product: "Product", brand_text: "Brand text", tagline: "Tagline", spoken_brand: "Brand said aloud" };
+
+// ------------------------------------------------------------------ data helpers
+const clone = o => JSON.parse(JSON.stringify(o));
+const fmt = f => (f / fps).toFixed(2) + " s";
+const curFrame = () => Math.max(0, Math.min(N - 1, Math.floor(vid.currentTime * fps + 1e-3)));
+const seekFrame = f => { vid.pause(); vid.currentTime = (Math.max(0, Math.min(N - 1, f)) + 0.5) / fps; };
+const isCut = f => cuts.some(c => c.frame === f);
+const roleColor = r => r === "brand" ? css("brand") : (css(r) || css("other"));
+function snapshot() { undo.push(clone({ s: doc.scenes, b: doc.brand_events })); if (undo.length > 100) undo.shift(); }
+function changed() { dirty = true; rebuild(); renderAll(); clearTimeout(saveTimer); saveTimer = setTimeout(() => save(false, true), 1800); }
+function rebuild() {
+  doc.scenes.sort((a, b) => a.start_frame - b.start_frame);
+  doc.scenes.forEach((s, k) => { s.idx = k; s.end_frame = k + 1 < doc.scenes.length ? doc.scenes[k + 1].start_frame : N; });
+  if (doc.scenes.length) doc.scenes[0].start_frame = 0;
+  sel = Math.max(0, Math.min(sel, doc.scenes.length - 1));
+  if (selB >= doc.brand_events.length) selB = -1;
+}
+const sceneAt = f => doc.scenes.findIndex(s => f >= s.start_frame && f < s.end_frame);
+
+// ------------------------------------------------------------------ edits
+function split(f) {
+  const i = sceneAt(f); if (i < 0 || f === doc.scenes[i].start_frame) return msg("A scene already starts here.");
+  snapshot(); const s = doc.scenes[i];
+  doc.scenes.push({ ...clone(s), start_frame: f, label: s.label + " (part 2)", description: "", boundary_method: isCut(f) ? "cut" : "manual", flags: [], human_checked: true });
+  s.human_checked = true; sel = i + 1; changed();
+}
+function moveStart(i, f) {
+  if (i <= 0) return msg("The first scene always starts at the beginning.");
+  const lo = doc.scenes[i - 1].start_frame + 1, hi = doc.scenes[i].end_frame - 1;
+  if (f < lo || f > hi) return msg("That would cross another scene — merge scenes instead.");
+  snapshot(); const s = doc.scenes[i];
+  s.start_frame = f; s.boundary_method = isCut(f) ? "cut" : "manual";
+  s.flags = (s.flags || []).filter(x => !/cut|in-shot|rejected/.test(x));
+  s.human_checked = doc.scenes[i - 1].human_checked = true; changed();
+}
+function mergeNext(i) { if (i >= doc.scenes.length - 1) return msg("This is the last scene."); snapshot(); doc.scenes.splice(i + 1, 1); doc.scenes[i].human_checked = true; sel = i; changed(); }
+function removeScene(i) {
+  if (doc.scenes.length < 2) return;
+  snapshot();
+  if (i === 0) { doc.scenes[1].start_frame = 0; doc.scenes.splice(0, 1); } else doc.scenes.splice(i, 1);
+  sel = Math.max(0, i - 1); changed();
+}
+function addBrand() {
+  const f = curFrame(); snapshot();
+  const e = { start_frame: f, end_frame: Math.min(N, f + Math.round(2 * fps)), kind: "logo", what: "", flags: [], human_checked: true, precision_frames: 0 };
+  doc.brand_events.push(e); doc.brand_events.sort((a, b) => a.start_frame - b.start_frame); selB = doc.brand_events.indexOf(e); changed();
+}
+
+// ------------------------------------------------------------------ rendering
+function renderAll() { renderStatus(); renderSel(); renderBrands(); renderTodo(); drawTL(); }
+function renderStatus() {
+  const st = $("status");
+  st.textContent = dirty ? "saving…" : (doc.status === "reviewed" ? "approved" : "draft");
+  st.className = "badge " + (dirty ? "warn" : doc.status === "reviewed" ? "good" : "");
+  $("undoBtn").disabled = !undo.length;
+}
+function renderSel() {
+  const s = doc.scenes[sel]; if (!s) return;
+  $("selTitle").textContent = `Scene ${sel + 1} of ${doc.scenes.length}`;
+  $("selTime").textContent = `${fmt(s.start_frame)} – ${fmt(s.end_frame)}`;
+  const set = (id, v) => { if (document.activeElement !== $(id)) $(id).value = v || ""; };
+  set("fLabel", s.label); set("fDesc", s.description); set("fAudio", s.audio);
+  $("roles").innerHTML = ROLES.map(r => `<button data-r="${r}" class="${r === s.story_role ? "on" : ""}"><i style="background:${roleColor(r)}"></i>${r.replace("_", " ")}</button>`).join("");
+  $("selMeta").textContent = `Boundary: ${sel === 0 ? "start of the ad" : s.boundary_method === "cut" ? "on a detected cut" : s.boundary_method === "manual" ? "placed by hand" : "inside a continuous shot"}` + (s.human_checked ? " · checked" : "");
+  $("mergeBtn").disabled = sel >= doc.scenes.length - 1; $("delBtn").disabled = doc.scenes.length < 2;
+}
+function renderBrands() {
+  const b = doc.brand_events;
+  $("brands").innerHTML = b.length ? b.map((e, i) => `<div class="brow ${i === selB ? "sel" : ""}" data-b="${i}">
+      <div class="top"><span class="badge ${e.kind === "spoken_brand" ? "" : "warn"}">${KIND_NAME[e.kind] || e.kind}</span><span>${esc((e.what || "").slice(0, 46))}</span><span class="t">${fmt(e.start_frame)} – ${fmt(e.end_frame)}</span></div>
+      ${i === selB ? `<div class="edit"><select data-bf="kind">${KINDS.map(k => `<option value="${k}" ${k === e.kind ? "selected" : ""}>${KIND_NAME[k] || k}</option>`).join("")}</select>
+        <button class="btn sm" data-bact="start">Starts at playhead</button><button class="btn sm" data-bact="end">Ends at playhead</button><button class="btn sm danger" data-bact="del">Remove</button>
+        <input type="text" data-bf="what" value="${esc(e.what)}" placeholder="What is shown or said"></div>` : ""}</div>`).join("")
+    : '<div class="small muted" style="padding:8px 0">No brand moments. Move the playhead to where the brand appears and press “Add at playhead”.</div>';
+}
+function todoItems() {
+  const out = [];
+  doc.scenes.forEach((s, i) => { if ((s.flags || []).length) out.push({ kind: "s", i, f: s.start_frame, title: `Scene ${i + 1}: ${s.label}`, why: s.flags.join("; ") }); });
+  doc.brand_events.forEach((e, i) => { if ((e.flags || []).length) out.push({ kind: "b", i, f: e.start_frame, title: `Brand moment: ${KIND_NAME[e.kind] || e.kind}`, why: e.flags.join("; ") }); });
+  return out;
+}
+function renderTodo() {
+  const t = todoItems();
+  $("todoCount").textContent = t.length ? `${t.length} left` : "all done";
+  $("todo").innerHTML = t.length ? t.map((x, k) => `<div class="todo" data-k="${k}"><div class="tx"><b>${esc(x.title)}</b><span>${esc(x.why)}</span></div><button class="btn sm" data-ok>Looks right</button></div>`).join("")
+    : `<div class="small muted" style="padding:8px 0">Nothing flagged. Play the ad once, check the scene edges and brand moments, then press <b>Approve</b>.</div>`;
+}
+
+// timeline geometry (no side padding: lines up with the film strip and the video)
+const LANE = { scenes: [6, 42], cuts: [48, 60], loud: [68, 104], words: [108, 126], brand: [134, 184] };
+const xOf = f => cv.clientWidth * f / N, xOfS = s => xOf(s * fps), fOf = x => Math.round(x / cv.clientWidth * N);
+function brandRow(i) { const [y0, y1] = LANE.brand, h = (y1 - y0) / 3; return [y0 + (i % 3) * h + 1, h - 2]; }
+function drawTL() {
+  if (!doc) return;
+  const dpr = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  if (cv.width !== Math.round(W * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+  ctx.font = '500 11px Inter, "Segoe UI", sans-serif'; ctx.textBaseline = "middle";
+  const muted = css("muted"), ink = css("ink"), line = css("line-2");
+  doc.scenes.forEach((s, i) => {
+    const x0 = xOf(s.start_frame), x1 = xOf(s.end_frame), [y0, y1] = LANE.scenes;
+    ctx.fillStyle = roleColor(s.story_role); ctx.globalAlpha = i === sel ? 1 : .7; ctx.fillRect(x0 + .5, y0, Math.max(1, x1 - x0 - 1), y1 - y0); ctx.globalAlpha = 1;
+    if ((s.flags || []).length) { ctx.fillStyle = css("bad"); ctx.fillRect(x0 + .5, y0, Math.max(1, x1 - x0 - 1), 3); }
+    if (i === sel) { ctx.strokeStyle = ink; ctx.lineWidth = 2; ctx.strokeRect(x0 + 1.5, y0 + 1, x1 - x0 - 3, y1 - y0 - 2); }
+    const room = x1 - x0 - 14; let t = `${i + 1}  ${s.label}`; ctx.fillStyle = "#fff";
+    if (ctx.measureText(t).width > room) { while (t.length > 4 && ctx.measureText(t + "…").width > room) t = t.slice(0, -1); t = t.length > 4 ? t.trimEnd() + "…" : String(i + 1); }
+    if (room > 6) ctx.fillText(t, x0 + 7, (y0 + y1) / 2);
+  });
+  cuts.forEach(c => { const x = xOf(c.frame), [y0, y1] = LANE.cuts; ctx.fillStyle = c.kind === "cut" ? (c.strength === "strong" ? ink : muted) : css("warn"); ctx.fillRect(x, y0, c.strength === "strong" ? 1.5 : 1, y1 - y0); });
+  if (AUDIO && AUDIO.has_audio) {
+    const L = AUDIO.loudness, [y0, y1] = LANE.loud, yOf = d => y1 - (Math.max(-60, Math.min(0, d)) + 60) / 60 * (y1 - y0);
+    ctx.fillStyle = css("surface-2"); ctx.fillRect(0, y0, W, y1 - y0);
+    ctx.beginPath(); ctx.moveTo(xOfS(L.t0), y1); L.db.forEach((d, i) => ctx.lineTo(xOfS(L.t0 + i * L.hop_s), yOf(d)));
+    ctx.lineTo(xOfS(L.t0 + (L.db.length - 1) * L.hop_s), y1); ctx.closePath(); ctx.fillStyle = css("setup"); ctx.fill();
+    AUDIO.events.filter(e => e.kind === "jump").forEach(e => { const x = xOfS(e.t); ctx.fillStyle = css("warn"); ctx.beginPath(); ctx.moveTo(x, y0 + 6); ctx.lineTo(x - 4, y0); ctx.lineTo(x + 4, y0); ctx.fill(); });
+    const segs = (AUDIO.transcript && AUDIO.transcript.segments) || [], [w0, w1] = LANE.words;
+    segs.forEach(sg => { const a = xOfS(sg.start), b = xOfS(sg.end); ctx.fillStyle = sg.reliable ? css("alertness") : line; ctx.fillRect(a, w0, Math.max(2, b - a), w1 - w0);
+      ctx.save(); ctx.beginPath(); ctx.rect(a, w0, b - a, w1 - w0); ctx.clip(); ctx.fillStyle = "#fff"; ctx.fillText(sg.text, a + 4, (w0 + w1) / 2); ctx.restore(); });
+  }
+  doc.brand_events.forEach((e, i) => { const [y, h] = brandRow(i), a = xOf(e.start_frame), w = Math.max(3, xOf(e.end_frame) - a);
+    ctx.fillStyle = e.kind === "spoken_brand" ? ink : css("brand"); ctx.globalAlpha = i === selB ? 1 : .7; ctx.fillRect(a, y, w, h); ctx.globalAlpha = 1;
+    if (i === selB) { ctx.strokeStyle = ink; ctx.lineWidth = 2; ctx.strokeRect(a + 1, y + 1, w - 2, h - 2); } });
+  if (drag && drag.pf != null) { ctx.fillStyle = css("accent"); ctx.fillRect(xOf(drag.pf) - 1, 0, 3, LANE.brand[1]); }
+  ctx.fillStyle = muted; ctx.font = '11px Inter, "Segoe UI", sans-serif'; ctx.textAlign = "center";
+  const step = N / fps > 100 ? 20 : N / fps > 45 ? 10 : 5;
+  for (let t = step; t < N / fps - step * .3; t += step) ctx.fillText(t + " s", xOfS(t), H - 10);
+  ctx.textAlign = "left";
+  const px = xOf(curFrame()); ctx.fillStyle = ink; ctx.fillRect(px - 1, 0, 2, H - 20);
+}
+
+// ------------------------------------------------------------------ timeline mouse
+function nearBoundary(x) { for (let i = 1; i < doc.scenes.length; i++) if (Math.abs(xOf(doc.scenes[i].start_frame) - x) <= 5) return i; return -1; }
+function snapTo(x, free) {
+  let f = Math.max(1, Math.min(N - 1, fOf(x))); if (free) return f;
+  let best = null; for (const c of cuts) { const d = Math.abs(xOf(c.frame) - x); if (d <= 8 && (!best || d < best.d)) best = { d, f: c.frame }; }
+  return best ? best.f : f;
+}
+function brandHit(x, y) {
+  for (let i = doc.brand_events.length - 1; i >= 0; i--) { const e = doc.brand_events[i], [by, bh] = brandRow(i), a = xOf(e.start_frame), b = Math.max(a + 3, xOf(e.end_frame));
+    if (y >= by && y <= by + bh && x >= a - 4 && x <= b + 4) return { i, part: x <= a + 5 ? "start" : x >= b - 5 ? "end" : "body" }; }
+  return null;
+}
+cv.addEventListener("mousemove", e => {
+  const x = e.offsetX, y = e.offsetY;
+  if (drag) {
+    if (drag.type === "scene") drag.pf = snapTo(x, e.altKey);
+    else { const f = Math.max(0, Math.min(N, fOf(x))), ev = doc.brand_events[drag.i], len = drag.e0 - drag.s0;
+      if (drag.part === "start") ev.start_frame = Math.min(f, ev.end_frame - 1);
+      else if (drag.part === "end") ev.end_frame = Math.max(f, ev.start_frame + 1);
+      else { const s = Math.max(0, Math.min(N - len, drag.s0 + f - drag.f0)); ev.start_frame = s; ev.end_frame = s + len; }
+      drag.moved = true; }
+    return drawTL();
+  }
+  const h = y >= LANE.brand[0] ? brandHit(x, y) : null;
+  cv.style.cursor = (y >= LANE.scenes[0] && y <= LANE.scenes[1] && nearBoundary(x) > 0) || (h && h.part !== "body") ? "ew-resize" : h ? "grab" : "crosshair";
+});
+cv.addEventListener("mousedown", e => {
+  const x = e.offsetX, y = e.offsetY;
+  if (y >= LANE.scenes[0] && y <= LANE.scenes[1]) {
+    const b = nearBoundary(x); if (b > 0) { drag = { type: "scene", i: b, pf: doc.scenes[b].start_frame }; return; }
+    const i = sceneAt(fOf(x)); if (i >= 0) { sel = i; renderSel(); }
+  } else if (y >= LANE.brand[0]) {
+    const h = brandHit(x, y);
+    if (h) { selB = h.i; const ev = doc.brand_events[h.i]; drag = { type: "brand", i: h.i, part: h.part, f0: fOf(x), s0: ev.start_frame, e0: ev.end_frame, snap: clone({ s: doc.scenes, b: doc.brand_events }) }; renderBrands(); drawTL(); return; }
+    if (selB !== -1) { selB = -1; renderBrands(); }
+  }
+  seekFrame(fOf(x));
+});
+window.addEventListener("mouseup", () => {
+  if (!drag) return; const d = drag; drag = null;
+  if (d.type === "scene") { if (d.pf !== doc.scenes[d.i].start_frame) { moveStart(d.i, d.pf); seekFrame(d.pf); } else drawTL(); }
+  else if (d.moved) { undo.push(d.snap); const ev = doc.brand_events[d.i]; ev.flags = []; ev.human_checked = true; changed(); }
+});
+
+// ------------------------------------------------------------------ side panel
+let focusSnap = null;
+document.addEventListener("focusin", e => { if (e.target.matches("#fLabel,#fDesc,#fAudio,[data-bf]")) focusSnap = clone({ s: doc.scenes, b: doc.brand_events }); });
+const bindField = (id, key) => $(id).addEventListener("change", () => { if (focusSnap) undo.push(focusSnap); focusSnap = null; const s = doc.scenes[sel]; s[key] = $(id).value; s.human_checked = true; changed(); });
+bindField("fLabel", "label"); bindField("fDesc", "description"); bindField("fAudio", "audio");
+$("roles").addEventListener("click", e => { const b = e.target.closest("[data-r]"); if (!b) return; snapshot(); const s = doc.scenes[sel]; s.story_role = b.dataset.r; s.human_checked = true; changed(); });
+$("brands").addEventListener("click", e => {
+  const row = e.target.closest(".brow"); if (!row) return; const i = +row.dataset.b, b = doc.brand_events[i], a = e.target.dataset.bact, f = curFrame();
+  if (a === "start") { if (f >= b.end_frame) return msg("Start must be before the end."); snapshot(); b.start_frame = f; b.flags = []; b.human_checked = true; return changed(); }
+  if (a === "end") { if (f + 1 <= b.start_frame) return msg("End must be after the start."); snapshot(); b.end_frame = f + 1; b.flags = []; b.human_checked = true; return changed(); }
+  if (a === "del") { snapshot(); doc.brand_events.splice(i, 1); selB = -1; return changed(); }
+  if (e.target.matches("input,select")) return;
+  if (selB !== i) { selB = i; seekFrame(b.start_frame); renderBrands(); drawTL(); }
+});
+$("brands").addEventListener("change", e => { const row = e.target.closest(".brow"), f = e.target.dataset.bf; if (!row || !f) return;
+  if (focusSnap) undo.push(focusSnap); focusSnap = null; const b = doc.brand_events[+row.dataset.b]; b[f] = e.target.value; b.human_checked = true; changed(); });
+$("todo").addEventListener("click", e => {
+  const row = e.target.closest(".todo"); if (!row) return; const x = todoItems()[+row.dataset.k]; if (!x) return;
+  if (e.target.closest("[data-ok]")) { snapshot(); const o = x.kind === "s" ? doc.scenes[x.i] : doc.brand_events[x.i]; o.flags = []; o.human_checked = true; return changed(); }
+  if (x.kind === "s") { sel = x.i; selB = -1; } else selB = x.i;
+  seekFrame(x.f); renderSel(); renderBrands(); drawTL();
+});
+
+// ------------------------------------------------------------------ controls
+function stepCut(dir) { const f = curFrame(), list = cuts.map(c => c.frame).concat(doc.scenes.map(s => s.start_frame)).sort((a, b) => a - b);
+  const t = dir > 0 ? list.find(x => x > f) : list.reverse().find(x => x < f); if (t != null) seekFrame(t); }
+$("prevF").onclick = () => seekFrame(curFrame() - 1); $("nextF").onclick = () => seekFrame(curFrame() + 1);
+$("prevCut").onclick = () => stepCut(-1); $("nextCut").onclick = () => stepCut(1);
+$("play").onclick = () => vid.paused ? vid.play() : vid.pause();
+$("splitBtn").onclick = () => split(curFrame());
+$("setStart").onclick = () => moveStart(sel, curFrame());
+$("setEnd").onclick = () => sel < doc.scenes.length - 1 ? moveStart(sel + 1, curFrame() + 1) : msg("The last scene always ends at the end of the ad.");
+$("mergeBtn").onclick = () => mergeNext(sel); $("delBtn").onclick = () => removeScene(sel); $("addBrand").onclick = addBrand;
+$("undoBtn").onclick = () => { if (!undo.length) return; const u = undo.pop(); doc.scenes = u.s; doc.brand_events = u.b; changed(); };
+$("saveBtn").onclick = () => save(false); $("approveBtn").onclick = () => save(true);
+$("helpBtn").onclick = () => $("help").classList.toggle("hidden");
+document.addEventListener("click", e => { if (!e.target.closest("#help,#helpBtn")) $("help").classList.add("hidden"); });
+vid.addEventListener("play", () => $("play").textContent = "Pause"); vid.addEventListener("pause", () => $("play").textContent = "Play");
+document.addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); return save(false); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !e.target.matches("input,textarea")) { e.preventDefault(); return $("undoBtn").click(); }
+  if (e.target.matches("input,textarea,select") || !doc) return;
+  const k = e.key.toLowerCase();
+  if (e.key === " ") { e.preventDefault(); $("play").click(); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); e.shiftKey ? stepCut(-1) : seekFrame(curFrame() - 1); }
+  else if (e.key === "ArrowRight") { e.preventDefault(); e.shiftKey ? stepCut(1) : seekFrame(curFrame() + 1); }
+  else if (k === "s") split(curFrame());
+  else if (k === "b") addBrand();
+  else if (e.key === "Delete" && selB >= 0) { snapshot(); doc.brand_events.splice(selB, 1); selB = -1; changed(); }
+  else if (e.key === "[") $("setStart").click(); else if (e.key === "]") $("setEnd").click();
+});
+window.addEventListener("beforeunload", e => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+window.addEventListener("resize", drawTL); window.addEventListener("themechange", () => { renderAll(); });
+
+function update() {
+  if (!doc) return; const f = curFrame();
+  $("readout").textContent = `${(f / fps).toFixed(2)} s · frame ${f}` + (isCut(f) ? " · on a cut" : "");
+  const t = f / fps, sg = AUDIO && AUDIO.transcript && AUDIO.transcript.segments.find(s => t >= s.start && t < s.end);
+  $("heard").textContent = sg ? `Heard: “${sg.text}”${sg.reliable ? "" : " (uncertain)"}` : "Heard: no words";
+  const i = sceneAt(f); if (i >= 0 && i !== sel && !vid.paused) { sel = i; renderSel(); }
+  drawTL();
+}
+let looping = false;
+function tick() { looping = true; if (!vid.paused) update(); requestAnimationFrame(tick); }
+vid.addEventListener("seeked", update); vid.addEventListener("loadeddata", update);
+
+// ------------------------------------------------------------------ io
+function msg(t, err) { const m = $("msg"); m.textContent = t || ""; m.className = err ? "err" : ""; if (t && !err) setTimeout(() => { if (m.textContent === t) m.textContent = ""; }, 4000); }
+async function save(approving, quiet) {
+  clearTimeout(saveTimer);
+  if (approving && todoItems().length && !confirm(`${todoItems().length} flagged item(s) are not checked yet. Approve anyway?`)) return;
+  let j; try { j = await (await fetch(`/api/scenes/${AD}` + (approving ? "/approve" : ""), { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scenes: doc.scenes, brand_events: doc.brand_events }) })).json(); } catch (e) { return msg("Could not save — is the app server running?", true); }
+  if (!j.ok) return msg("Not approved: " + (j.problems || [j.error]).join("; "), true);
+  doc.status = j.status; dirty = false; renderStatus();
+  if (!quiet) msg(approving ? "Approved. Results now use these scenes after the next analysis." : "Saved." + (j.problems && j.problems.length ? " To fix before approval: " + j.problems.join("; ") : ""), j.problems && j.problems.length && !approving);
+  if (approving) loadAdList(AD);
+}
+async function loadAd(ad) {
+  if (dirty) await save(false, true);
+  const j = await (await fetch(`/api/scenes/${ad}`)).json();
+  if (j.error) { msg(j.error, true); return; }
+  AD = ad; doc = j.doc; cuts = j.cuts; AUDIO = j.audio; ROLES = j.roles; KINDS = j.brand_kinds;
+  fps = doc.fps; N = doc.n_frames; sel = 0; selB = -1; undo = []; dirty = false;
+  vid.src = `/media/${doc.video}`; vid.poster = `/api/thumb/${ad}?t=1&w=960`;
+  const n = 16, dur = N / fps;
+  $("film").innerHTML = Array.from({ length: n }, (_, k) => `<img loading="lazy" alt="" src="/api/thumb/${ad}?t=${((k + .5) / n * dur).toFixed(1)}&w=160">`).join("");
+  $("story").innerHTML = `<p class="prose"><b>${esc(doc.story?.brand || "")} · ${esc(doc.story?.product || "")}</b></p><p class="prose">${esc(doc.story?.summary || "")}</p>` +
+    (doc.story?.audio_summary ? `<p class="prose"><b>Sound:</b> ${esc(doc.story.audio_summary)}</p>` : "") +
+    (AUDIO && AUDIO.transcript && AUDIO.transcript.text ? `<p class="prose"><b>Transcript:</b> ${esc(AUDIO.transcript.text)}</p>` : "");
+  $("legend").innerHTML = ROLES.map(r => `<span><i style="background:${roleColor(r)}"></i>${r.replace("_", " ")}</span>`).join("") +
+    `<span><i style="background:var(--bad);height:3px"></i>to check</span><span><i style="background:var(--ink);width:2px"></i>detected cut</span><span><i style="background:var(--setup)"></i>loudness</span>` +
+    `<span><i style="background:var(--alertness)"></i>speech</span><span><i style="background:var(--brand)"></i>brand shown</span><span><i style="background:var(--ink)"></i>brand said</span>`;
+  rebuild(); renderAll(); msg(""); history.replaceState(null, "", `?ad=${ad}`);
+  vid.addEventListener("loadedmetadata", () => { seekFrame(0); if (!looping) tick(); }, { once: true });
+}
+async function loadAdList(keep) {
+  const ads = await (await fetch("/api/ads")).json();
+  $("adSel").innerHTML = ads.map(a => `<option value="${a.ad}" ${a.scenes_status ? "" : "disabled"}>${a.ad}${a.scenes_status ? (a.scenes_status === "reviewed" ? " · approved" : " · draft") : " (not labelled)"}</option>`).join("");
+  if (keep) { $("adSel").value = keep; return; }
+  const want = new URLSearchParams(location.search).get("ad");
+  const first = ads.find(a => a.ad === want && a.scenes_status) || ads.find(a => a.scenes_status);
+  if (first) { $("adSel").value = first.ad; loadAd(first.ad); }
+}
+$("adSel").onchange = e => loadAd(e.target.value);
+loadAdList();
+</script>
+</body>
+</html>

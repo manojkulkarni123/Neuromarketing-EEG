@@ -9,6 +9,12 @@
 !/Review2_Neuromarketing_EEG.pptx
 !/Neuromarketing_EEG_Project_Report.docx
 !/Neuromarketing_EEG_Project_Report.pdf
+!/IndustryPanel_Neuromarketing_EEG.pptx
+!/IndustryPanel_Neuromarketing_EEG_v2.pptx
+!/UI_REDESIGN_BRIEF.md
+
+# Local web app (Ad Copilot): code, pages, bundled open-licence fonts. No data lives here.
+!/app/
 
 !/lab_task_psychopy/
 /lab_task_psychopy/*
@@ -22,6 +28,11 @@
 !/pipeline/edf_reader.py
 !/pipeline/analyze_alpha_blocking.py
 !/pipeline/build_replay.py
+!/pipeline/scene_values.py
+!/pipeline/label_scenes.py
+!/pipeline/scene_detector.py
+!/pipeline/ad_audio.py
+!/pipeline/make_ad_profiles.py
 
 !/lab_task/
 /lab_task/*

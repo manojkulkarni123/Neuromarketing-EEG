@@ -1,0 +1,715 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Results · Ad Copilot</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/shell.js"></script>
+<style>
+.pagehead select { min-width: 250px; font-weight: 500; }
+.work { display: grid; grid-template-columns: minmax(0, 2.3fr) minmax(300px, 1fr); gap: 16px; align-items: start; }
+.work.solo { grid-template-columns: minmax(0, 1fr); } .work.solo .take { display: none; }
+.work.solo .vidbox video { max-height: 58vh; }
+.stage.nocharts .stackwrap, .stage.nocharts .lanebar { display: none; }
+@media (max-width: 1100px) { .work { grid-template-columns: minmax(0, 1fr); } }
+
+/* video + synced stack: same width, one time axis */
+.stage { overflow: hidden; }
+.vidbox { background: #000; position: relative; display: flex; justify-content: center; }
+.vidbox video { width: 100%; max-height: 50vh; aspect-ratio: 16/9; object-fit: contain; display: block; background: #000; cursor: pointer; }
+.bigplay { position: absolute; inset: 0; margin: auto; width: 64px; height: 64px; border-radius: 50%; border: 0; background: rgba(17, 24, 39, .72); color: #fff; cursor: pointer; display: grid; place-items: center; }
+.bigplay svg { width: 26px; height: 26px; margin-left: 4px; }
+.ctrl { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.ctrl .now { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ctrl .heard { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
+.iconbtn { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--surface); display: grid; place-items: center; cursor: pointer; color: var(--ink); flex: none; }
+.iconbtn:hover { background: var(--surface-2); } .iconbtn svg { width: 14px; height: 14px; }
+.stackwrap { position: relative; }
+#stack { display: block; width: 100%; cursor: crosshair; }
+.tip { position: absolute; pointer-events: none; z-index: 5; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-lg); border-radius: 10px; padding: 8px; font-size: 12px; width: 260px; display: none; }
+.tip img { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 6px; display: block; background: #000; margin-bottom: 6px; }
+.tip .r { display: flex; justify-content: space-between; gap: 8px; }
+.tip .up { color: var(--good); font-weight: 600; } .tip .dn { color: var(--bad); font-weight: 600; } .tip .mid { color: var(--muted); }
+.chartbar { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px 10px; border-bottom: 1px solid var(--line); }
+.chartbar .seg button i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: 1px; }
+.chartbar .desc { font-size: 12.5px; color: var(--ink-2); display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.stage.nocharts .chartbar { display: none; }
+.emo { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(240px, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 900px) { .emo { grid-template-columns: 1fr; } }
+.emoplot { position: relative; } #emoCv { display: block; width: 100%; }
+.emoside .r { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; }
+.emopick { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.emopick img { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 8px; background: #000; }
+.emopick .btn { align-self: flex-start; }
+.lanebar { display: flex; align-items: center; gap: 8px 10px; padding: 12px 14px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.lanebar .techsw { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.lanebar .chip { padding: 3px 10px; font-size: 12px; } .lanebar .chip i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.legend { flex: 1; display: flex; gap: 6px 18px; padding-top: 4px; font-size: 11.5px; color: var(--muted); align-items: center; flex-wrap: wrap; }
+.legend i { display: inline-block; vertical-align: middle; margin-right: 4px; }
+
+/* takeaways */
+.take { max-height: calc(100vh - 96px); overflow: auto; }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
+.fact { background: var(--surface-2); border-radius: 8px; padding: 12px 14px; }
+.fact b { display: block; font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.fact span { font-size: 11.5px; color: var(--muted); display: block; margin-top: 2px; line-height: 1.4; }
+.ins { padding: 14px 0; border-top: 1px solid var(--line); cursor: pointer; }
+.ins:hover .h { color: var(--accent); }
+.ins .h { font-weight: 600; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.ins .ev { font-size: 12px; color: var(--ink-2); margin-top: 2px; }
+.ins .idea { margin-top: 6px; padding: 8px 10px; border-radius: 8px; background: var(--accent-weak); color: var(--ink); }
+.ins .cau { font-size: 11.5px; color: var(--warn); margin-top: 4px; }
+.take h3 { margin: 22px 0 8px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: .1em; font-size: 11px; } .take h3:first-of-type { margin-top: 0; }
+
+/* scenes filmstrip */
+.strip { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; }
+.sc { flex: 0 0 236px; overflow: hidden; cursor: pointer; }
+.sc.cur { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-weak); }
+.sc .im { position: relative; }
+.sc img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; background: #000; }
+.sc .tm { position: absolute; right: 6px; bottom: 6px; font-size: 10.5px; font-weight: 600; padding: 1px 6px; border-radius: 99px; background: rgba(0, 0, 0, .65); color: #fff; }
+.sc .bd { padding: 12px 12px 14px; display: flex; flex-direction: column; gap: 7px; }
+.sc .ttl { font-weight: 600; font-size: 12.5px; line-height: 1.3; }
+.sc .role { font-size: 11px; color: var(--muted); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.sc .role i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+.mrow { display: grid; grid-template-columns: 1fr 14px auto; gap: 6px; align-items: center; font-size: 11.5px; }
+.mrow .ar { font-weight: 700; text-align: center; } .mrow .lv { color: var(--muted); font-size: 10.5px; white-space: nowrap; }
+
+details.card > summary { list-style: none; cursor: pointer; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
+details.card > summary::-webkit-details-marker { display: none; }
+details.card > summary::after { content: "Show"; font-weight: 500; font-size: 12px; color: var(--muted); }
+details.card[open] > summary::after { content: "Hide"; }
+details.card[open] > summary { border-bottom: 1px solid var(--line); }
+.tbl { width: 100%; font-size: 12.5px; } .tbl th { text-align: left; font-size: 11px; font-weight: 600; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.tbl td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.stackv { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; }
+.objgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.objlist { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+
+/* ask slide-over */
+.ask { position: fixed; top: 0; right: 0; bottom: 0; width: 420px; max-width: 100vw; background: var(--surface); border-left: 1px solid var(--line); box-shadow: var(--shadow-lg); z-index: 50; display: flex; flex-direction: column; transform: translateX(105%); transition: transform .18s ease; }
+.ask.open { transform: none; }
+.ask .hd { padding: 14px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+#chat { flex: 1; overflow: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+.msg { font-size: 13px; line-height: 1.55; }
+.msg.user { align-self: flex-end; background: var(--accent); color: var(--accent-ink); padding: 7px 12px; border-radius: 12px 12px 3px 12px; max-width: 88%; }
+.msg.bot { background: var(--surface-2); border-radius: 3px 12px 12px 12px; padding: 10px 12px; }
+.msg.bot p { margin: 0 0 7px; } .msg.bot p:last-of-type { margin-bottom: 0; }
+.msg.err { background: var(--bad-weak); color: var(--bad); padding: 9px 12px; border-radius: 10px; }
+.msg .meta { margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--line); font-size: 11px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.tbtn { font: inherit; font-size: 12px; font-weight: 600; color: var(--accent); background: var(--accent-weak); border: 0; border-radius: 99px; padding: 1px 8px; cursor: pointer; }
+.sugg { display: flex; flex-direction: column; gap: 6px; }
+.sugg button { text-align: left; font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--surface); cursor: pointer; color: var(--ink); }
+.sugg button:hover { border-color: var(--accent); color: var(--accent); }
+.askin { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line); } .askin input { flex: 1; }
+.dots span { display: inline-block; width: 6px; height: 6px; margin-right: 3px; border-radius: 50%; background: var(--muted); animation: b 1s infinite ease-in-out; }
+.dots span:nth-child(2) { animation-delay: .15s; } .dots span:nth-child(3) { animation-delay: .3s; }
+@keyframes b { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+@media print { .ask, .bigplay, .lanebar .chip { display: none !important; } .take { max-height: none; } .work { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="pagehead">
+  <h1>Results</h1>
+  <select id="adSel" aria-label="Ad"></select>
+  <select id="viewSel" aria-label="Viewers"></select>
+  <span class="sub" id="headSub"></span>
+  <span class="spacer"></span>
+  <a class="btn noprint" id="csvBtn" title="Scene values for every viewing">Download CSV</a>
+  <button class="btn noprint" id="printBtn">Print report</button>
+  <button class="btn noprint hidden" id="takeShow">Show takeaways</button>
+  <button class="btn primary noprint" id="askBtn">Ask the copilot</button>
+</div>
+
+<div class="page">
+  <div class="work">
+    <section class="card stage">
+      <div class="vidbox"><video id="vid" preload="auto" playsinline></video>
+        <button class="bigplay noprint" id="bigPlay" aria-label="Play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l14 8-14 8z"/></svg></button></div>
+      <div class="ctrl">
+        <button class="iconbtn noprint" id="playBtn" aria-label="Play or pause"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l14 8-14 8z"/></svg></button>
+        <span class="num small" id="clock">0.0 s</span>
+        <span class="now" id="nowLabel"></span><span class="heard" id="nowHeard"></span>
+        <button class="btn sm ghost noprint" id="chartsBtn">Hide charts</button>
+      </div>
+      <div class="chartbar">
+        <div class="seg" id="mSeg" role="tablist" aria-label="Measure"></div>
+        <div class="desc" id="mDesc"></div>
+      </div>
+      <div class="stackwrap"><canvas id="stack"></canvas><div class="tip" id="tip"></div></div>
+      <div class="lanebar"><span class="legend" id="legend"></span><label class="techsw noprint"><input type="checkbox" id="techSw"> Technical layers</label></div>
+    </section>
+
+    <section class="card take">
+      <div class="card-h"><h2>Takeaways</h2><span class="small muted" id="insSub" style="flex:1;text-align:right"></span><button class="btn sm ghost noprint" id="takeHide">Hide</button></div>
+      <div class="card-b" id="insBody"><span class="muted">Loading…</span></div>
+    </section>
+  </div>
+
+  <div class="stackv">
+    <details class="card" id="dScenes" open><summary>Scenes · what the AI saw and how viewers responded</summary><div class="card-b"><div class="strip" id="strip"></div></div></details>
+    <details class="card" id="dEmo"><summary>Emotional response map · direction (Approach) × intensity (Engagement)</summary><div class="card-b" id="emoBody"></div></details>
+    <details class="card" id="dViewers"><summary>Viewers and recording quality</summary><div id="viewersBody" style="overflow:auto"></div></details>
+    <details class="card" id="dObj"><summary>Campaign objectives and how they are tested</summary><div class="card-b" id="objBody"></div></details>
+    <details class="card" id="dCompare"><summary>Compare two ads for the same viewer</summary><div class="card-b" id="cmpBody"></div></details>
+    <details class="card" id="dTech"><summary>Technical details · formulas, settings and exact values</summary><div class="card-b" id="techBody"></div></details>
+    <details class="card" id="dGuide"><summary>How to read the measures</summary><div class="card-b" id="guideBody"></div></details>
+  </div>
+</div>
+
+<aside class="ask noprint" id="ask" aria-label="Copilot">
+  <div class="hd"><h2 style="flex:1">Ask the copilot</h2><button class="btn sm ghost" id="askClose">Close</button></div>
+  <div id="chat"></div>
+  <form class="askin" id="askForm"><input type="text" id="q" placeholder="Ask about this ad…" autocomplete="off"><button class="btn primary">Ask</button></form>
+</aside>
+
+<script>
+const $ = id => document.getElementById(id);
+const vid = $("vid"), cv = $("stack"), ctx = cv.getContext("2d");
+let CSSC = {}, THEMEV = 0, LOADV = 0;
+const css = v => v in CSSC ? CSSC[v] : (CSSC[v] = getComputedStyle(document.documentElement).getPropertyValue("--" + v).trim());
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const ORDER = ["attention", "alertness", "effort", "wanting"];
+const NAME = { attention: "Visual attention", alertness: "Engagement", effort: "Mental effort", wanting: "Approach" };
+const LV = { consistent: ["good", "consistent"], repeated: ["accent", "repeated"], mixed: ["", "mixed"], single: ["", "one viewing"], none: ["", "no clean data"], fact: ["", "from the ad itself"] };
+const qs = new URLSearchParams(location.search);
+let AD = qs.get("ad"), SCOPE = qs.get("session") || "all";
+let D = null, TL = [], INS = null, VIEW = {}, hoverT = null, chatHist = [];
+const dur = () => D ? D.ad.duration_s : 1;
+const fmtT = t => t >= 60 ? `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}` : `${t.toFixed(1)} s`;
+const thumb = (t, w = 420) => `/api/thumb/${AD}?t=${Math.max(0, t).toFixed(1)}&w=${w}`;
+const sceneAt = t => D.scenes.find(s => t >= s.start_s && t < s.end_s) || D.scenes[D.scenes.length - 1];
+
+// ------------------------------------------------------------------ load
+async function getJ(u) { return (await fetch(u)).json(); }
+async function loadAd(ad, keepChat) {
+  const first = await getJ(`/api/analysis/${ad}`);
+  if (first.error) { $("insBody").textContent = first.error; return; }
+  AD = ad; D = first; VIEW = {}; INS = null; TL = []; EMO_SEL = null;
+  if (!keepChat) chatHist = [];
+  if (SCOPE !== "all" && !D.sessions.includes(SCOPE)) SCOPE = "all";
+  vid.src = `/media/${D.ad.file}`; vid.poster = thumb(dur() * 0.45, 960);
+  renderHead(); if (!keepChat) resetChat();
+  const [tl, ins, ...views] = await Promise.all([getJ(`/api/timelines/${ad}`), getJ(`/api/insights/${ad}`),
+    ...D.sessions.map(s => getJ(`/api/analysis/${ad}?session=${encodeURIComponent(s)}`))]);
+  if (ad !== AD) return;
+  TL = tl.viewings || []; INS = ins.error ? null : ins;
+  D.sessions.forEach((s, i) => VIEW[s] = views[i]);
+  renderHead(); renderLaneBar(); renderTakeaways(); renderStrip(); renderViewers(); renderObjectives(); renderGuide(); renderTech(); renderCompare(); renderEmotion(); LOADV++; draw(); updateNow();
+  TECH = mem.get("tech") === "on" || qs.get("tech") === "1"; renderLaneBar(); draw();
+  if (qs.get("m") && NAME[qs.get("m")]) { M = qs.get("m"); renderLaneBar(); draw(); }
+  if (qs.get("open")) document.querySelectorAll("#dTech, #dCompare, #dEmo").forEach(d => d.open = true);
+  history.replaceState(null, "", `?ad=${ad}` + (SCOPE !== "all" ? `&session=${encodeURIComponent(SCOPE)}` : ""));
+}
+function renderHead() {
+  $("adSel").innerHTML = D.all_ads.map(a => `<option value="${a.ad}" ${a.ad === AD ? "selected" : ""}>${esc(a.brand || a.ad)} — ${esc((a.product || "").slice(0, 40))}${a.n ? "" : " (no viewers yet)"}</option>`).join("");
+  const n = D.sessions.length;
+  $("viewSel").innerHTML = (n ? `<option value="all">All viewers (${n})</option>` : "<option value='all'>No viewers yet</option>") +
+    D.sessions.map(s => `<option value="${esc(s)}" ${s === SCOPE ? "selected" : ""}>Viewer ${esc(s)}</option>`).join("");
+  $("viewSel").disabled = !n;
+  const nv = TL.length;
+  $("headSub").textContent = `${Math.round(dur())} s · ${D.scenes.length} scenes` + (n ? ` · ${n} viewer${n > 1 ? "s" : ""}, ${nv} clean viewing${nv === 1 ? "" : "s"}` : "") +
+    (D.ad.scenes_status === "reviewed" ? "" : " · scene labels not yet reviewed");
+  $("csvBtn").href = `/api/export/${AD}.csv`;
+}
+$("adSel").onchange = e => loadAd(e.target.value);
+$("viewSel").onchange = e => { SCOPE = e.target.value; EMO_SEL = null; renderLaneBar(); renderTech(); renderCompare(); renderEmotion(); draw(); history.replaceState(null, "", `?ad=${AD}` + (SCOPE !== "all" ? `&session=${encodeURIComponent(SCOPE)}` : "")); };
+$("printBtn").onclick = () => { document.querySelectorAll("details.card").forEach(d => d.open = true); setTimeout(() => window.print(), 150); };
+
+// ------------------------------------------------------------------ the chart: one measure at a time, vs the viewer's rest
+const FONT = 'Inter, "Segoe UI", sans-serif';
+const UNIT = { attention: "%", alertness: "%", effort: " dB", wanting: "" };
+const fmtV = (m, v) => v == null ? "–" : (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(m === "wanting" ? 2 : 1) + UNIT[m];
+const fmtP = (m, v) => v == null ? "–" : (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(m === "wanting" ? 2 : 1) + (m === "effort" ? " dB" : m === "wanting" ? "" : " points");
+const TIER = { attention: "primary measure", alertness: "supporting · emotional intensity", effort: "exploratory", wanting: "supporting · emotional direction" };
+const DESC = {
+  attention: "Up = eyes and brain locked on the screen (alpha at the back of the head drops).",
+  alertness: "Up = more alert and activated — the intensity side of emotion (arousal).",
+  effort: "Up = working harder to follow (frontal theta). Says nothing about whether the effort felt good.",
+  wanting: "Up = leaning toward the content, down = pulling away — the direction side of emotion (valence). Noisier than the others: trust it only when it repeats.",
+};
+let M = "attention", TECH = false;
+const C = { scene: 28, brand: 18, gap: 10, plot: 270, axis: 24 };
+const med = a => a.length % 2 ? a[(a.length - 1) / 2] : (a[a.length / 2 - 1] + a[a.length / 2]) / 2;
+function valueAt(pts, t) { let best = null, bd = 1e9; for (const p of pts) { const d = Math.abs(p[0] - t); if (d < bd) { bd = d; best = p; } } return best && bd <= 0.6 ? best[1] : null; }
+function chartViewers() { return (SCOPE === "all" ? D.sessions : [SCOPE]).filter(s => VIEW[s]); }
+function sceneOf(vw, idx) { return (vw.scenes || []).find(q => q.idx === idx); }
+function noisyAt(vw, m, t) { const s = D.scenes.find(q => t >= q.start_s && t < q.end_s), x = s && sceneOf(vw, s.idx), v = x && x.values[m]; return !!(v && (v.verdict || "").startsWith("too")); }
+// every viewing as a line (noisy stretches blank)
+function lines(m) {
+  const out = [];
+  chartViewers().forEach(s => { const vw = VIEW[s];
+    const t1 = ((vw.timeline || {})[m] || []).map(p => [p[0], p[1] == null || noisyAt(vw, m, p[0]) ? null : p[1]]);
+    if (t1.some(p => p[1] != null)) out.push({ s, viewing: 1, pts: t1 });
+    const t2 = (vw.timeline_v2 || {})[m] || [];
+    if (t2.some(p => p[1] != null)) out.push({ s, viewing: 2, pts: t2 }); });
+  return out;
+}
+function medianLine(ls) {
+  if (ls.length < 2) return null;
+  return ls[0].pts.map(p => p[0]).map(t => { const a = ls.map(l => valueAt(l.pts, t)).filter(x => x != null).sort((x, y) => x - y);
+    return [t, a.length >= Math.max(2, Math.ceil(ls.length / 2)) ? med(a) : null]; });
+}
+// scene average vs rest: one viewer -> its value, rest range and verdict; all -> median and verdict counts
+function sceneRest(m, sc) {
+  const rows = chartViewers().map(s => ({ s, v: (sceneOf(VIEW[s], sc.idx) || { values: {} }).values[m] })).filter(r => r.v);
+  if (!rows.length) return null;
+  const clean = rows.filter(r => r.v.value != null && !(r.v.verdict || "").startsWith("too"));
+  if (!clean.length) return { noisy: true, rows };
+  const up = clean.filter(r => r.v.verdict.startsWith("above")).length, dn = clean.filter(r => r.v.verdict.startsWith("below")).length;
+  const one = clean.length === 1 ? clean[0].v : null;
+  return { rows, clean, value: one ? one.value : med(clean.map(r => r.v.value).sort((a, b) => a - b)),
+    lo: SCOPE !== "all" && one ? one.rest_lo : null, hi: SCOPE !== "all" && one ? one.rest_hi : null,
+    dir: up === clean.length ? "above" : dn === clean.length ? "below" : "within", up, dn, n: clean.length };
+}
+// does this scene stand out from the ad's typical scene, and did that repeat?
+function sceneVal(m, s) {
+  if (SCOPE === "all") {
+    const sc = INS && INS.scenes.find(x => x.idx === s.idx); if (!sc || sc.skip) return null;
+    const c = sc.measures[m]; if (!c || c.level === "none" || c.mean == null) return null;
+    return { v: c.mean, ok: c.level === "consistent" || c.level === "repeated", tag: `${c.agree}/${c.of} viewings`, level: c.level };
+  }
+  const vw = VIEW[SCOPE]; if (!vw) return null;
+  const sc = sceneOf(vw, s.idx), val = sc && sc.values[m];
+  if (!val || val.vs_ad_median == null || (s.start_s + s.end_s) / 2 < 2) return null;
+  const r = ((vw.scene_replication || {})[m] || {})[s.idx] || "";
+  const ok = (r.startsWith("confirmed") || r.startsWith("repeated")) && Math.abs(val.vs_ad_median) > 1e-9;
+  return { v: val.vs_ad_median, ok, tag: ok ? "both times" : "", level: r };
+}
+function yRange(m, ls, bars) {
+  // scale from what is drawn (lines + scene averages), never from rest bands (attention bands reach −4000 %)
+  const vals = [0, ...ls.flatMap(l => l.pts.map(p => p[1]).filter(v => v != null))].sort((a, b) => a - b);
+  const q = p => vals[Math.min(vals.length - 1, Math.max(0, Math.round(p * (vals.length - 1))))];
+  const sv = bars.map(b => b[1].value);
+  let lo = Math.min(0, q(0.04), ...sv), hi = Math.max(0, q(0.96), ...sv);
+  const pad = (hi - lo || 1) * 0.14; return [lo - pad, hi + pad];
+}
+function niceTicks(lo, hi, n) { const span = hi - lo, raw = span / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), st = [1, 2, 2.5, 5, 10].map(k => k * mag).find(k => span / k <= n) || mag * 10; const out = []; for (let v = Math.ceil(lo / st) * st; v <= hi; v += st) out.push(+v.toFixed(6)); return out; }
+const fmtTick = (m, v) => (m === "wanting" ? v.toFixed(2) : Math.round(v)) + UNIT[m].trim();
+const xOf = (t, W) => W * t / dur(), tOf = (x, W) => Math.max(0, Math.min(dur(), x / W * dur()));
+const plotY0 = () => C.scene + C.brand + C.gap;
+const SCV = document.createElement("canvas"); let SKEY = "", LASTF = "";
+function draw() {
+  if (!D) return;
+  const W = cv.clientWidth, H = plotY0() + C.plot + C.axis, dpr = devicePixelRatio || 1;
+  if (cv.style.height !== H + "px") cv.style.height = H + "px";
+  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  const key = [AD, SCOPE, M, TECH, W, H, dpr, THEMEV, LOADV, INS ? 1 : 0, Object.keys(VIEW).length].join("|");
+  if (key !== SKEY) { SCV.width = cv.width; SCV.height = cv.height; drawStatic(SCV.getContext("2d"), W, H, dpr); SKEY = key; LASTF = ""; }
+  const tNow = vid.currentTime || 0, px = Math.round(xOf(tNow, W) * 2) / 2;
+  const f = [key, px, hoverT == null ? "" : Math.round(xOf(hoverT, W))].join("|");
+  if (f === LASTF) return;                      // nothing visible changed: skip the frame entirely
+  LASTF = f;
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); ctx.drawImage(SCV, 0, 0);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const y0 = plotY0(), y1 = y0 + C.plot, cur = sceneAt(tNow), ink = css("ink");
+  if (cur) { const a = xOf(cur.start_s, W), b = xOf(cur.end_s, W);
+    ctx.fillStyle = css("accent"); ctx.globalAlpha = .06; ctx.fillRect(a, y0, b - a, C.plot); ctx.globalAlpha = 1;
+    ctx.fillStyle = ink; ctx.fillRect(a + 0.5, C.scene - 3, Math.max(1, b - a - 1), 3); }
+  if (hoverT != null) { const x = xOf(hoverT, W); ctx.strokeStyle = css("muted"); ctx.lineWidth = 1; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, y1); ctx.stroke(); ctx.setLineDash([]); }
+  ctx.fillStyle = ink; ctx.fillRect(px - 1, 0, 2, y1);
+  ctx.beginPath(); ctx.moveTo(px - 5, 0); ctx.lineTo(px + 5, 0); ctx.lineTo(px, 7); ctx.closePath(); ctx.fill();
+}
+function drawStatic(ctx, W, H, dpr) {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+  const ink = css("ink"), ink2 = css("ink-2"), muted = css("muted"), line = css("line"), good = css("good"), bad = css("bad");
+  const cur = null, y0 = plotY0(), y1 = y0 + C.plot;
+  ctx.textBaseline = "middle";
+  // scene strip
+  D.scenes.forEach(s => { const a = xOf(s.start_s, W), b = xOf(s.end_s, W);
+    ctx.fillStyle = s.story_role === "brand" ? css("brand") : (css(s.story_role) || css("other"));
+    ctx.globalAlpha = cur && cur.idx === s.idx ? 1 : .82; ctx.fillRect(a + 0.5, 0, Math.max(1, b - a - 1), C.scene); ctx.globalAlpha = 1;
+    ctx.fillStyle = "#fff"; ctx.font = `500 11px ${FONT}`;
+    const room = b - a - 14; let txt = `${s.idx + 1}  ${s.label}`;
+    if (ctx.measureText(txt).width > room) { while (txt.length > 4 && ctx.measureText(txt + "…").width > room) txt = txt.slice(0, -1); txt = txt.length > 4 ? txt.trimEnd() + "…" : String(s.idx + 1); }
+    if (room > 6) ctx.fillText(txt, a + 7, C.scene / 2 + 0.5); });
+  // brand lane: bars = brand on screen, dots = brand said
+  const by = C.scene + 4, bh = C.brand - 8;
+  ctx.fillStyle = css("surface-2"); ctx.fillRect(0, C.scene, W, C.brand);
+  D.brand_events.forEach(e => { if (e.kind === "spoken_brand") return; ctx.fillStyle = css("brand"); ctx.globalAlpha = .85;
+    ctx.fillRect(xOf(e.start_s, W), by, Math.max(2, xOf(e.end_s, W) - xOf(e.start_s, W)), bh); ctx.globalAlpha = 1; });
+  D.brand_events.forEach(e => { if (e.kind !== "spoken_brand") return; ctx.fillStyle = ink; ctx.beginPath(); ctx.arc(xOf(e.start_s, W), by + bh / 2, 3.5, 0, 7); ctx.fill(); });
+  // plot
+  ctx.fillStyle = css("surface"); ctx.fillRect(0, y0, W, C.plot);
+  if (cur) { ctx.fillStyle = css("accent-weak"); ctx.globalAlpha = .55; ctx.fillRect(xOf(cur.start_s, W), y0, xOf(cur.end_s, W) - xOf(cur.start_s, W), C.plot); ctx.globalAlpha = 1; }
+  const ls = lines(M), bars = TECH ? D.scenes.map(sc => [sc, sceneRest(M, sc)]).filter(x => x[1] && !x[1].noisy) : [];
+  const mdn = SCOPE === "all" ? (ls.length > 1 ? medianLine(ls) : ls[0] ? ls[0].pts : null) : null;
+  const shown = SCOPE !== "all" ? ls : [...(TECH ? ls : []), ...(mdn ? [{ pts: mdn }] : [])];
+  const finish = () => {
+    ctx.strokeStyle = line; ctx.lineWidth = 1;
+    D.scenes.slice(1).forEach(s => { const x = Math.round(xOf(s.start_s, W)) + 0.5; ctx.beginPath(); ctx.moveTo(x, C.scene); ctx.lineTo(x, y1); ctx.stroke(); });
+    ctx.fillStyle = muted; ctx.font = `11px ${FONT}`; ctx.textAlign = "center";
+    const step = dur() > 100 ? 20 : dur() > 45 ? 10 : 5;
+    for (let t = step; t < dur() - step * 0.3; t += step) ctx.fillText(t + " s", xOf(t, W), y1 + C.axis / 2);
+    ctx.textAlign = "left";
+  };
+  if (!ls.length && !bars.length) {
+    ctx.fillStyle = muted; ctx.font = `13px ${FONT}`; ctx.textAlign = "center";
+    ctx.fillText(!D.sessions.length ? "No viewer has watched this ad yet." : M === "wanting" ? "Approach could not be measured here — it needs a working left/right frontal electrode pair." : "Not measurable for this selection.", W / 2, (y0 + y1) / 2);
+    ctx.textAlign = "left"; finish(); return; }
+  const [lo, hi] = yRange(M, shown, bars), yOf = v => y1 - 4 - (Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo) * (C.plot - 8);
+  // grid
+  const ticks = niceTicks(lo, hi, 5);
+  ctx.strokeStyle = line; ctx.lineWidth = 1;
+  ticks.forEach(v => { const y = Math.round(yOf(v)) + 0.5; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); });
+  // per scene: noisy hatch or this viewer's rest range
+  D.scenes.forEach(sc => { const r = sceneRest(M, sc); if (!r) return; const a = xOf(sc.start_s, W), b = xOf(sc.end_s, W);
+    if (r.noisy) { ctx.save(); ctx.beginPath(); ctx.rect(a, y0, b - a, C.plot); ctx.clip(); ctx.strokeStyle = line; ctx.lineWidth = 1.2;
+      for (let x = a - C.plot; x < b; x += 7) { ctx.beginPath(); ctx.moveTo(x, y1); ctx.lineTo(x + C.plot, y0); ctx.stroke(); }
+      ctx.restore(); if (b - a > 50) { ctx.fillStyle = muted; ctx.font = `11px ${FONT}`; ctx.textAlign = "center"; ctx.fillText("too noisy", (a + b) / 2, y0 + 12); ctx.textAlign = "left"; } return; }
+    if (TECH && r.lo != null) { ctx.fillStyle = css("surface-3"); ctx.globalAlpha = .8; ctx.fillRect(a + 1, yOf(r.hi), b - a - 2, Math.max(1, yOf(r.lo) - yOf(r.hi))); ctx.globalAlpha = 1; } });
+  // rest line
+  ctx.strokeStyle = ink2; ctx.setLineDash([4, 4]); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, yOf(0)); ctx.lineTo(W, yOf(0)); ctx.stroke(); ctx.setLineDash([]);
+  // lines: one viewer = 1st viewing solid + 2nd dashed; all = faint line per viewing + bold middle
+  const path = (pts, k) => { ctx.beginPath(); let pen = false;
+    pts.forEach((p, i) => { if (p[1] == null) { pen = false; return; }
+      const w = pts.slice(Math.max(0, i - k), i + k + 1).filter(x => x[1] != null), sm = w.reduce((t, x) => t + x[1], 0) / w.length;
+      const x = xOf(p[0], W), y = yOf(sm); pen ? ctx.lineTo(x, y) : ctx.moveTo(x, y); pen = true; }); ctx.stroke(); };
+  if (SCOPE !== "all") {
+    ls.forEach(l => { ctx.strokeStyle = l.viewing === 1 ? css(M) : ink2; ctx.lineWidth = l.viewing === 1 ? 1.8 : 1.4; ctx.globalAlpha = l.viewing === 1 ? .75 : .7;
+      ctx.setLineDash(l.viewing === 1 ? [] : [5, 4]); path(l.pts, 1); ctx.setLineDash([]); ctx.globalAlpha = 1; });
+  } else {
+    if (TECH) ls.forEach(l => { ctx.strokeStyle = css(M); ctx.lineWidth = 1; ctx.globalAlpha = .25; ctx.setLineDash(l.viewing === 2 ? [4, 3] : []); path(l.pts, 1); ctx.setLineDash([]); ctx.globalAlpha = 1; });
+    if (mdn) { ctx.strokeStyle = css(M); ctx.lineWidth = 2.2; ctx.globalAlpha = .95; path(mdn, 2); ctx.globalAlpha = 1; }
+  }
+  // scene averages vs rest: green above the rest range, red below, grey within
+  bars.forEach(([sc, r]) => { const a = xOf(sc.start_s, W) + 4, b = xOf(sc.end_s, W) - 4, y = yOf(r.value);
+    const col = r.dir === "above" ? good : r.dir === "below" ? bad : muted;
+    ctx.strokeStyle = col; ctx.lineWidth = 4; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(a, y); ctx.lineTo(Math.max(a + 1, b), y); ctx.stroke(); ctx.lineCap = "butt";
+    if (b - a > 48) { ctx.fillStyle = col; ctx.font = `600 10.5px ${FONT}`; ctx.textAlign = "center"; ctx.fillText(fmtV(M, r.value), (a + b) / 2, y > y0 + 34 ? y - 10 : y + 11); ctx.textAlign = "left"; } });
+  // stand-out scenes that repeated across viewings: tag at the top of the scene
+  D.scenes.forEach(sc => { const d = sceneVal(M, sc); if (!d || !d.ok) return; const a = xOf(sc.start_s, W), b = xOf(sc.end_s, W);
+    const col = d.v >= 0 ? good : bad, ar = d.v >= 0 ? "▲" : "▼", short = d.tag.replace(" viewings", "");
+    ctx.font = `700 10.5px ${FONT}`;
+    const txt = [`${ar} ${d.v >= 0 ? "stood out" : "dipped"} · ${d.tag}`, `${ar} ${d.tag}`, `${ar} ${short}`, ar].find(t => ctx.measureText(t).width + 12 <= b - a - 4);
+    if (!txt) return; const tw = ctx.measureText(txt).width + 12;
+    ctx.fillStyle = col; ctx.globalAlpha = .12; ctx.fillRect((a + b - tw) / 2, y0 + 4, tw, 17); ctx.globalAlpha = 1;
+    ctx.fillStyle = col; ctx.textAlign = "center"; ctx.save(); ctx.beginPath(); ctx.rect((a + b - tw) / 2, y0, tw, 24); ctx.clip(); ctx.fillText(txt, (a + b) / 2, y0 + 13); ctx.restore(); ctx.textAlign = "left"; });
+  // y labels last, on a small backdrop so lines never hide them
+  ctx.font = `10.5px ${FONT}`;
+  ticks.forEach(v => { const y = yOf(v), s = fmtTick(M, v), w = ctx.measureText(s).width + 8;
+    if (y < y0 + 26 && v !== 0) return;
+    ctx.fillStyle = css("surface"); ctx.globalAlpha = .85; ctx.fillRect(2, y - 8, w, 16); ctx.globalAlpha = 1; ctx.fillStyle = muted; ctx.fillText(s, 6, y); });
+  ctx.fillStyle = ink2; ctx.font = `600 10.5px ${FONT}`; ctx.textAlign = "right"; ctx.fillText("rest", W - 6, yOf(0) - 8); ctx.textAlign = "left";
+  finish();
+}
+let dragging = false;
+function evT(e) { const r = cv.getBoundingClientRect(); return tOf(e.clientX - r.left, r.width); }
+let resumeAfterDrag = false;
+cv.addEventListener("mousedown", e => { dragging = true; resumeAfterDrag = !vid.paused; if (resumeAfterDrag) vid.pause(); seek(evT(e)); });
+window.addEventListener("mouseup", () => { if (dragging && resumeAfterDrag) vid.play(); dragging = false; resumeAfterDrag = false; });
+cv.addEventListener("mousemove", e => {
+  if (!D) return; hoverT = evT(e); if (dragging) seek(hoverT); draw();
+  const s = sceneAt(hoverT), tip = $("tip"), r = sceneRest(M, s), d = sceneVal(M, s), sg = D.transcript.find(x => hoverT >= x.start_s && hoverT < x.end_s);
+  const rest = v => v.verdict.startsWith("above") ? ["up", "higher than at rest"] : v.verdict.startsWith("below") ? ["dn", "lower than at rest"] : ["mid", "same as at rest"];
+  const who = SCOPE === "all" ? D.sessions : [SCOPE];
+  const per = who.map(p => { const x = (sceneOf(VIEW[p] || {}, s.idx) || { values: {} }).values[M];
+    if (!x || (x.value == null && !(x.verdict || "").startsWith("too"))) return `<div class="r"><span>${esc(p)}</span><span class="mid">not measurable</span></div>`;
+    if ((x.verdict || "").startsWith("too")) return `<div class="r"><span>${esc(p)}</span><span class="mid">too noisy to judge</span></div>`;
+    const w = rest(x); return `<div class="r"><span>${esc(p)}${SCOPE === "all" ? "" : " · 1st time"}</span><span class="${w[0]}">${w[1]}</span></div>`; }).join("");
+  let verdict;
+  if ((s.start_s + s.end_s) / 2 < 2) verdict = `<div class="mid">First 2 seconds — eyes still settling, not judged.</div>`;
+  else if (d && d.ok) verdict = `<div class="${d.v >= 0 ? "up" : "dn"}"><b>${d.v >= 0 ? "▲ Stood out" : "▼ Dipped"}</b> compared with the rest of this ad — ${SCOPE === "all" ? `${d.tag} agree` : "both times"}</div>`;
+  else if (d) verdict = `<div class="mid">No clear difference from the rest of this ad${SCOPE === "all" && INS ? "" : ""}.</div>`;
+  else verdict = `<div class="mid">No clear difference from the rest of this ad.</div>`;
+  const body = `<div style="margin:2px 0 4px">${verdict}</div>${per}`;
+  tip.innerHTML = `<img src="${thumb(Math.round(hoverT * 2) / 2, 220)}" alt=""><div class="tiny" style="color:${css(M)};font-weight:700;text-transform:uppercase;letter-spacing:.06em">${NAME[M]}</div><div class="r"><b>${esc(s.label)}</b><span class="num muted">${fmtT(hoverT)}</span></div>${body}` +
+    (sg ? `<div class="mid" style="margin-top:4px">“${esc(sg.text.slice(0, 90))}”</div>` : "");
+  tip.style.display = "block";
+  const wrap = cv.parentElement.getBoundingClientRect(), x = e.clientX - wrap.left;
+  tip.style.left = Math.min(wrap.width - 268, Math.max(4, x + 14)) + "px"; tip.style.top = (plotY0() + 6) + "px";
+});
+cv.addEventListener("mouseleave", () => { hoverT = null; $("tip").style.display = "none"; draw(); });
+window.addEventListener("resize", () => { draw(); renderEmotion(); }); window.addEventListener("themechange", () => { CSSC = {}; THEMEV++; renderLaneBar(); renderStrip(); renderGuide(); renderEmotion(); draw(); });
+document.fonts && document.fonts.ready.then(draw);
+function renderLaneBar() {
+  $("mSeg").innerHTML = ORDER.map(m => `<button data-m="${m}" class="${m === M ? "on" : ""}"><i style="background:${css(m)}"></i>${NAME[m]}</button>`).join("");
+  $("mDesc").innerHTML = `<b>${NAME[M]}</b> <span class="badge">${TIER[M]}</span> ${esc(DESC[M])}`;
+  const L = (sw, txt) => `<span>${sw}${txt}</span>`, col = css(M);
+  $("legend").innerHTML = (SCOPE === "all"
+      ? L(`<i style="width:16px;height:3px;background:${col}"></i>`, "All viewers") + (TECH ? L(`<i style="width:16px;height:1px;background:${col};opacity:.5"></i>`, "each viewing") : "")
+      : L(`<i style="width:16px;height:2px;background:${col}"></i>`, "1st time") + L(`<i style="width:16px;border-top:2px dashed var(--ink-2)"></i>`, "2nd time")) +
+    L(`<i style="width:16px;border-top:1px dashed var(--ink-2)"></i>`, "rest (before the ads)") +
+    L(`<b style="color:var(--good);margin-right:4px">▲</b><b style="color:var(--bad);margin-right:4px">▼</b>`, "scene stood out / dipped, and it repeated") +
+    L(`<i style="width:12px;height:8px;background:var(--brand)"></i>`, "brand shown") + L(`<i style="width:7px;height:7px;border-radius:50%;background:var(--ink)"></i>`, "brand said") +
+    (TECH ? L(`<i style="width:12px;height:8px;background:var(--surface-3)"></i>`, "normal range at rest") +
+      L(`<i style="width:12px;height:4px;border-radius:2px;background:var(--good)"></i><i style="width:12px;height:4px;border-radius:2px;background:var(--bad)"></i>`, "scene average above / below rest") : "");
+  $("techSw").checked = TECH;
+}
+$("techSw").addEventListener("change", e => { TECH = e.target.checked; mem.set("tech", TECH ? "on" : "off"); renderLaneBar(); draw(); });
+$("mSeg").addEventListener("click", e => { const b = e.target.closest("[data-m]"); if (!b) return; M = b.dataset.m; renderLaneBar(); draw(); });
+
+// ------------------------------------------------------------------ emotional response map (direction x intensity)
+let EMO_SEL = null;
+function emoPoints() {
+  const out = [];
+  D.scenes.forEach(s => { if ((s.start_s + s.end_s) / 2 < 2) return;
+    const a = sceneVal("wanting", s), e = sceneVal("alertness", s);
+    if (a && e) out.push({ s, x: a.v, y: e.v, ok: a.ok && e.ok, okx: a.ok, oky: e.ok, tx: a.tag || a.level, ty: e.tag || e.level }); });
+  return out;
+}
+function renderEmotion() {
+  const box = $("emoBody"); if (!box || !D || !$("dEmo").open) return;
+  const pts = emoPoints(), who = SCOPE === "all" ? `all clean viewings (${INS ? INS.viewings : 0})` : `viewer ${SCOPE}`;
+  const self = chartViewers().map(s => { const r = (VIEW[s] || {}).ratings || {}; return [s, r.feeling_valence, r.feeling_arousal, r.liking]; });
+  const selfTxt = self.length ? self.map(([s, v, a, l]) => `<div class="r"><span>${esc(s)}</span><span class="num">${v != null ? `feeling ${v}/9` : "feeling not asked"}${a != null ? ` · calm–excited ${a}/9` : ""}${l != null ? ` · liked ${l}/9` : ""}</span></div>`).join("") : '<span class="muted">No viewers.</span>';
+  if (!pts.length) { box.innerHTML = `<div class="muted">${D.sessions.length ? "Approach could not be measured for " + esc(who) + " — it needs a working left/right frontal electrode pair (F3/F4 or Fp1/Fp2). Engagement alone is in the chart above." : "No viewer has watched this ad yet."}</div>`; return; }
+  box.innerHTML = `<div class="emo"><div class="emoplot"><canvas id="emoCv"></canvas><div class="tip" id="emoTip"></div></div>
+    <div class="emoside"><div class="small muted">Each dot is a scene, placed by how it differed from this ad's typical scene for ${esc(who)}. <b>Right</b> = viewers leaned toward it (Approach, direction). <b>Up</b> = they were more activated (Engagement, intensity). Solid dots repeated on both measures; hollow dots did not yet.</div>
+      <div id="emoPick" class="emopick"><span class="muted small">Click a dot to see the scene.</span></div>
+      <div class="section-title" style="margin-top:12px">What viewers said</div><div class="small">${selfTxt}</div>
+      <div class="tiny muted" style="margin-top:10px">EEG gives direction and intensity, not named feelings — it cannot tell joy from pride. Direction (Approach) is the noisier of the two.</div></div></div>`;
+  const c = $("emoCv"), x = c.getContext("2d"), W = c.clientWidth, H = 360, dpr = devicePixelRatio || 1;
+  c.style.height = H + "px"; c.width = W * dpr; c.height = H * dpr; x.setTransform(dpr, 0, 0, dpr, 0, 0); x.textBaseline = "middle";
+  const P = 34, lx = Math.max(...pts.map(p => Math.abs(p.x)), 1e-6) * 1.2, ly = Math.max(...pts.map(p => Math.abs(p.y)), 1e-6) * 1.2;
+  const X = v => P + (v / lx + 1) / 2 * (W - 2 * P), Y = v => H - P - (v / ly + 1) / 2 * (H - 2 * P);
+  const muted = css("muted"), line = css("line");
+  [["drawn in · more intense", W - P - 6, P + 10, "right"], ["pulling away · more intense", P + 6, P + 10, "left"], ["drawn in · calmer", W - P - 6, H - P - 10, "right"], ["pulling away · calmer", P + 6, H - P - 10, "left"]]
+    .forEach(([t, px, py, al]) => { x.fillStyle = muted; x.font = `600 11px ${FONT}`; x.textAlign = al; x.fillText(t, px, py); });
+  x.strokeStyle = line; x.lineWidth = 1; x.beginPath(); x.moveTo(X(0) + .5, P - 10); x.lineTo(X(0) + .5, H - P + 10); x.moveTo(P - 10, Y(0) + .5); x.lineTo(W - P + 10, Y(0) + .5); x.stroke();
+  x.fillStyle = muted; x.font = `11px ${FONT}`; x.textAlign = "center";
+  x.fillText("← pulling away        Approach (direction)        drawn in →", W / 2, H - 10);
+  x.save(); x.translate(12, H / 2); x.rotate(-Math.PI / 2); x.fillText("calmer ←   Engagement (intensity)   → more intense", 0, 0); x.restore();
+  pts.forEach(p => { const px = X(p.x), py = Y(p.y), col = p.s.story_role === "brand" ? css("brand") : (css(p.s.story_role) || css("other"));
+    x.beginPath(); x.arc(px, py, 9, 0, 7); if (p.ok) { x.fillStyle = col; x.fill(); } else { x.fillStyle = css("surface"); x.fill(); x.strokeStyle = col; x.lineWidth = 2; x.stroke(); }
+    if (EMO_SEL === p.s.idx) { x.strokeStyle = css("ink"); x.lineWidth = 2; x.beginPath(); x.arc(px, py, 13, 0, 7); x.stroke(); }
+    x.fillStyle = p.ok ? "#fff" : css("ink"); x.font = `700 10px ${FONT}`; x.textAlign = "center"; x.fillText(p.s.idx + 1, px, py + .5); });
+  x.textAlign = "left";
+  const hit = e => { const r = c.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top; return pts.find(p => Math.hypot(X(p.x) - mx, Y(p.y) - my) < 12); };
+  c.onmousemove = e => { const p = hit(e), tip = $("emoTip"); c.style.cursor = p ? "pointer" : "default"; if (!p) { tip.style.display = "none"; return; }
+    tip.innerHTML = `<b>${p.s.idx + 1}. ${esc(p.s.label)}</b><div class="r"><span>Approach</span><span class="num">${fmtP("wanting", p.x)}</span></div><div class="r"><span>Engagement</span><span class="num">${fmtP("alertness", p.y)}</span></div><div class="mid">${p.ok ? "repeated on both" : "not repeated on both yet"}</div>`;
+    tip.style.display = "block"; tip.style.left = Math.min(W - 236, X(p.x) + 14) + "px"; tip.style.top = Math.max(0, Y(p.y) - 20) + "px"; };
+  c.onmouseleave = () => $("emoTip").style.display = "none";
+  c.onclick = e => { const p = hit(e); if (!p) return; EMO_SEL = p.s.idx; renderEmotion(); seek(p.s.start_s);
+    $("emoPick").innerHTML = `<img src="${thumb((p.s.start_s + p.s.end_s) / 2, 420)}" alt=""><b>${p.s.idx + 1}. ${esc(p.s.label)}</b><div class="small muted">${fmtT(p.s.start_s)}–${fmtT(p.s.end_s)} · ${esc(p.s.story_role.replace("_", " "))}</div>
+      <div class="small">Approach ${fmtP("wanting", p.x)} (${esc(p.tx || "")}) · Engagement ${fmtP("alertness", p.y)} (${esc(p.ty || "")}) vs this ad's typical scene</div>
+      <button class="btn sm" id="emoPlay">Play this scene</button>`;
+    $("emoPlay").onclick = () => jump(p.s.start_s); };
+}
+document.getElementById("dEmo").addEventListener("toggle", e => { if (e.target.open) renderEmotion(); });
+
+// ------------------------------------------------------------------ collapsing (remembered)
+const mem = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
+function setTake(hidden) { document.querySelector(".work").classList.toggle("solo", hidden); $("takeShow").classList.toggle("hidden", !hidden); mem.set("take", hidden ? "off" : "on"); setTimeout(draw, 30); }
+function setCharts(hidden) { document.querySelector(".stage").classList.toggle("nocharts", hidden); $("chartsBtn").textContent = hidden ? "Show charts" : "Hide charts"; mem.set("charts", hidden ? "off" : "on"); setTimeout(draw, 30); }
+$("takeHide").onclick = () => setTake(true); $("takeShow").onclick = () => setTake(false);
+$("chartsBtn").onclick = () => setCharts(!document.querySelector(".stage").classList.contains("nocharts"));
+if (mem.get("take") === "off") setTake(true); if (mem.get("charts") === "off") setCharts(true);
+
+// ------------------------------------------------------------------ video
+const PLAY = '<path d="M6 4l14 8-14 8z"/>', PAUSE = '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>';
+function toggle() { vid.paused ? vid.play() : vid.pause(); }
+function seek(t) { vid.currentTime = Math.max(0, Math.min(dur() - 0.05, t)); updateNow(); }
+function jump(t) { seek(t); vid.play(); }
+$("playBtn").onclick = toggle; $("bigPlay").onclick = toggle; vid.addEventListener("click", toggle);
+vid.addEventListener("play", () => { $("bigPlay").classList.add("hidden"); $("playBtn").querySelector("svg").innerHTML = PAUSE; });
+vid.addEventListener("pause", () => { $("playBtn").querySelector("svg").innerHTML = PLAY; });
+vid.addEventListener("ended", () => $("bigPlay").classList.remove("hidden"));
+document.addEventListener("keydown", e => { if (e.code === "Space" && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { e.preventDefault(); toggle(); } });
+let lastScene = -1;
+const setTxt = (id, v) => { const e = $(id); if (e.textContent !== v) e.textContent = v; };
+function updateNow() {
+  if (!D) return; const t = vid.currentTime || 0, s = sceneAt(t);
+  setTxt("clock", `${fmtT(t)} / ${fmtT(dur())}`);
+  const sg = D.transcript.find(x => t >= x.start_s && t < x.end_s);
+  setTxt("nowLabel", s ? s.label : ""); setTxt("nowHeard", sg ? "“" + sg.text + "”" : "");
+  if (s && s.idx !== lastScene) { lastScene = s.idx; document.querySelectorAll(".sc").forEach(c => c.classList.toggle("cur", +c.dataset.i === s.idx)); }
+  draw();
+}
+vid.addEventListener("timeupdate", updateNow); vid.addEventListener("seeked", updateNow);
+(function loop() { if (!vid.paused) updateNow(); requestAnimationFrame(loop); })();
+
+// ------------------------------------------------------------------ takeaways
+function renderTakeaways() {
+  if (!INS) { $("insBody").innerHTML = '<span class="muted">No takeaways available.</span>'; return; }
+  const a = INS.audit, f = [];
+  if (a.first_brand_s != null) f.push([`${a.first_brand_s} s`, `brand first shown · ${a.first_brand_pct}% into the ad`]);
+  if (a.first_spoken_s != null) f.push([`${a.first_spoken_s} s`, `brand first said aloud · ${a.times_spoken}× in total`]);
+  f.push([`${a.brand_on_screen_pct}%`, "of the ad shows the brand or product"]);
+  if (a.first_speech_s != null) f.push([`${a.first_speech_s} s`, "first spoken words"]);
+  const tag = i => `<span class="badge ${LV[i.level][0]}">${LV[i.level][1]}</span>`;
+  const item = (i, idea) => `<div class="ins" data-t="${i.t ?? 0}"><div class="h"><span>${esc(idea ? i.label : i.text)}</span>${tag(i)}</div>
+      <div class="ev">${esc(i.evidence)}</div>${idea ? `<div class="idea">${esc(i.idea)}</div>` : ""}
+      ${i.cautions && i.cautions.length ? `<div class="cau">Note: ${esc(i.cautions.join(", "))} in this scene can move EEG by itself.</div>` : ""}</div>`;
+  $("insSub").textContent = INS.viewings ? `${INS.viewers.length} viewer${INS.viewers.length === 1 ? "" : "s"} · all viewings combined` : "from the ad itself — no recordings yet";
+  $("insBody").innerHTML = `<h3>The ad at a glance</h3><div class="facts">${f.map(x => `<div class="fact"><b>${esc(x[0])}</b><span>${esc(x[1])}</span></div>`).join("")}</div>
+    <h3>What held viewers</h3>${INS.strengths.length ? INS.strengths.map(i => item(i, false)).join("") : `<div class="muted small">${INS.viewings ? "Nothing repeated across viewings yet." : "Record viewers to see this."}</div>`}
+    <h3>Ideas to test</h3>${INS.ideas.length ? INS.ideas.map(i => item(i, true)).join("") : '<div class="muted small">No data-backed suggestion for this ad.</div>'}
+    <div class="tiny muted" style="margin-top:12px">${esc(INS.rules)} Pilot data: individual viewers, not a market verdict.</div>`;
+}
+document.addEventListener("click", e => { const x = e.target.closest(".ins, .sc"); if (x && x.dataset.t != null) jump(+x.dataset.t); });
+
+function renderStrip() {
+  const sc = INS ? INS.scenes : D.scenes.map(s => ({ idx: s.idx, label: s.label, role: s.story_role, start_s: s.start_s, end_s: s.end_s, brand: [], brand_visible: false, measures: null }));
+  $("strip").innerHTML = sc.map(s => `<div class="card sc" data-i="${s.idx}" data-t="${s.start_s}">
+      <div class="im"><img loading="lazy" src="${thumb((s.start_s + s.end_s) / 2, 420)}" alt=""><span class="tm">${fmtT(s.start_s)}–${fmtT(s.end_s)}</span></div>
+      <div class="bd"><div class="ttl">${esc(s.label)}</div>
+        <div class="role"><span><i style="background:${s.role === "brand" ? css("brand") : css(s.role)}"></i> ${esc(s.role.replace("_", " "))}</span>${s.brand_visible ? '<span class="badge warn">brand on screen</span>' : ""}${(s.brand || []).includes("spoken_brand") ? '<span class="badge">brand said</span>' : ""}</div>
+        ${INS && INS.viewings && s.measures ? (s.skip ? '<div class="tiny muted">First 2 s — not judged.</div>' : ORDER.map(m => { const c = s.measures[m]; if (!c) return "";
+          const ar = c.level === "none" ? "–" : c.direction === "up" ? "▲" : c.direction === "down" ? "▼" : "◆";
+          const col = (c.level === "consistent" || c.level === "repeated") ? (c.direction === "up" ? css("good") : css("bad")) : css("line-2");
+          return `<div class="mrow"><span>${NAME[m]}</span><span class="ar" style="color:${col}">${ar}</span><span class="lv">${c.level === "none" ? "no data" : c.level === "single" ? "1 viewing" : `${c.agree} of ${c.of} agree`}</span></div>`; }).join("")) : ""}
+      </div></div>`).join("");
+  lastScene = -1;
+}
+
+// ------------------------------------------------------------------ details
+function renderViewers() {
+  if (!D.sessions.length) { $("viewersBody").innerHTML = '<div class="empty">No viewer has watched this ad yet. Record one from <a href="/record">Record</a>.</div>'; return; }
+  const yn = v => v == null ? "–" : v ? "Yes" : "No";
+  $("viewersBody").innerHTML = `<table class="tbl"><thead><tr><th>Viewer</th><th>Liked the ad</th><th>Would buy</th><th>Feeling (1 unpleasant – 9 pleasant)</th><th>Calm – excited</th><th>Seen before</th><th>Brand recall</th><th>Electrodes left out</th><th>Eyes-closed check</th><th>Brand moment (visual attention)</th><th>Repeats on 2nd viewing</th></tr></thead><tbody>` +
+    D.sessions.map(s => { const v = VIEW[s] || {}, r = v.ratings || {}, si = v.session_info || {};
+      let bads = []; try { bads = JSON.parse(si.bad_channels || "[]"); } catch (e) {}
+      const bt = ((v.brand_test || {}).attention || []).find(x => x.viewing === 1), rel = (v.reliability || {}).attention;
+      const noisy = ((v.ad_detail || {}).attention || {}).verdict || "";
+      return `<tr><td><b>${esc(s)}</b>${noisy.startsWith("too") ? '<div><span class="badge warn">first viewing too noisy</span></div>' : ""}</td>
+        <td class="num">${r.liking != null ? r.liking + " / 9" : "–"}</td><td class="num">${r.purchase_intent != null ? r.purchase_intent + " / 9" : "–"}</td><td class="num">${r.feeling_valence != null ? r.feeling_valence + " / 9" : "not asked"}</td><td class="num">${r.feeling_arousal != null ? r.feeling_arousal + " / 9" : "not asked"}</td><td>${yn(r.seen_before)}</td>
+        <td>${r.brand_recall == null ? "not asked" : r.brand_recall ? "correct" : "not correct"}</td>
+        <td>${bads.length ? esc(bads.join(", ")) : "none"}</td>
+        <td class="num">${si.cap_check_ratio != null ? (+si.cap_check_ratio).toFixed(1) + "× " + (si.cap_check_ratio >= 1.3 ? "(ok)" : "(weak)") : "–"}</td>
+        <td>${esc((bt && bt.status) || "–")}</td><td>${esc((rel && rel.verdict) || "one viewing")}</td></tr>`; }).join("") + "</tbody></table>";
+}
+function renderObjectives() {
+  const p = D.profile && D.profile.profile; $("dObj").classList.toggle("hidden", !p); if (!p) return;
+  const src = s => s ? ` <a href="${esc(s)}" target="_blank" rel="noopener" class="small">source</a>` : "";
+  const list = (rows, ws) => `<ul class="objlist">${rows.map(r => `<li><b>${esc(r.field || r.metric)}:</b> ${esc(r.value)}${ws ? src(r.source) : ""}${r.note ? `<div class="tiny muted">${esc(r.note)}</div>` : ""}</li>`).join("")}</ul>`;
+  $("objBody").innerHTML = `<div class="objgrid"><div><div class="section-title">Documented (public sources)</div>${list(p.documented || [], true)}</div>
+    <div><div class="section-title">Our assumptions</div>${list(p.assumed || [], false)}<div class="section-title" style="margin-top:14px">Public outcome evidence — other people, not our viewers</div>${list(p.public_evidence || [], true)}</div></div>
+    <div class="section-title" style="margin-top:16px">Objective and how this system tests it</div>
+    <table class="tbl"><thead><tr><th>Objective</th><th>Basis</th><th>EEG evidence</th><th>Questions</th></tr></thead><tbody>${(p.objectives || []).map(o => `<tr><td><b>${esc(o.objective)}</b></td><td>${esc(o.basis)}</td><td>${esc(o.eeg)}</td><td>${esc((o.questions || []).join(", "))}</td></tr>`).join("")}</tbody></table>`;
+}
+const techViewer = () => SCOPE !== "all" ? SCOPE : D.sessions[0];
+const FORMULA = {
+  attention: ["Posterior alpha suppression", "100 × (1 − Pα(ad) / Pα(rest))", "α = 8–13 Hz · back of the head (Pz, O1, O2; else P3, P4)"],
+  alertness: ["Beta / alpha engagement index", "100 × ( (Pβ/Pα)(ad) / (Pβ/Pα)(rest) − 1 )", "β = 13–25 Hz, α = 8–13 Hz · Cz, Fz"],
+  effort: ["Frontal theta power", "10 × log10( Pθ(ad) / Pθ(rest) )   [dB]", "θ = 4–8 Hz · Fz (+ F3, F4 when both are good)"],
+  wanting: ["Frontal alpha asymmetry", "[ln Pα(right) − ln Pα(left)](ad) − [same](rest)", "α = 8–13 Hz · F4 vs F3 (else Fp2 vs Fp1)"],
+};
+function renderTech() {
+  const s = techViewer(), vw = s && VIEW[s];
+  if (!vw) { $("techBody").innerHTML = '<span class="muted">No recording for this ad yet.</span>'; return; }
+  const si = vw.session_info || {}; let used = {}, bads = [], post = {}, rf = {};
+  try { used = JSON.parse(si.channels_used || "{}"); bads = JSON.parse(si.bad_channels || "[]"); post = JSON.parse(si.posterior_check || "{}"); rf = JSON.parse(si.reference_fix || "{}"); } catch (e) {}
+  const det = vw.ad_detail || {};
+  $("techBody").innerHTML = `<div class="small muted" style="margin-bottom:10px">Viewer <b>${esc(s)}</b>${SCOPE === "all" ? " (choose another viewer at the top)" : ""} · P = band power from a Welch spectrum; “rest” = this viewer's 60 s eyes-open baseline.</div>
+    <table class="tbl"><thead><tr><th>Measure</th><th>Signal</th><th>Formula</th><th>Band · standard electrodes</th><th>Electrodes used for ${esc(s)}</th><th>Whole ad vs rest</th></tr></thead><tbody>${ORDER.map(m => {
+      const d = det[m] || {}, noisy = (d.verdict || "").startsWith("too");
+      return `<tr><td><b style="color:${css(m)}">${NAME[m]}</b></td><td>${FORMULA[m][0]}</td><td class="num"><code>${FORMULA[m][1]}</code></td><td>${FORMULA[m][2]}</td><td>${esc((used[m] || []).join(", ") || "not measurable")}</td><td class="num">${noisy ? "too noisy" : fmtV(m, d.value)}</td></tr>`; }).join("")}</tbody></table>
+    <div class="objgrid" style="margin-top:16px"><div><div class="section-title">Signal processing</div><ul class="objlist small">
+      <li>Recording: 19-channel dry cap, about 250 Hz (measured rate used), markers and every video frame on the EEG clock.</li>
+      <li>Filter 1–40 Hz. Shared reference noise removed only if channels are more than 50% alike${rf.applied ? ` — <b>applied for this viewer</b> (${rf.median_corr_before} → ${rf.median_corr_after})` : " — not needed for this viewer"}.</li>
+      <li>Electrodes left out: ${bads.length ? esc(bads.join(", ")) : "none"} (copy of an unconnected input, r > 0.8, or above 150 µV).</li>
+      <li>Eyes-closed / eyes-open alpha on attention electrodes (must be ≥ 1.3×): ${Object.keys(post).length ? Object.entries(post).map(([k, v]) => `${k} ${v}×`).join(", ") : "–"}.</li>
+      <li>Eye blinks removed with ICA (blink component found from Fp1/Fp2 below 4 Hz).</li></ul></div>
+    <div><div class="section-title">Measures and tests</div><ul class="objlist small">
+      <li>Spectrum: Welch, 1 s segments, 50% overlap, median-averaged. Scene value = that scene's frames (frame log) + 0.3 s brain delay.</li>
+      <li>Second-by-second line: 2 s windows every 0.5 s. Whole-ad value: median of 3 s windows (1 s step) inside the ad only.</li>
+      <li>Rest range (grey band): central 90% of same-length chunks of the viewer's own rest. Outside it = above / below rest.</li>
+      <li>Too noisy to judge: more than 30% of 0.5 s blocks above 150 µV peak-to-peak.</li>
+      <li>Emotion is read as two parts: Approach = direction (valence), Engagement = intensity (arousal). Approach on one person's 30 s of data moves by about 0.18 from noise alone, so it counts only when it repeats.</li>
+      <li>Brand-moment test: brand-on-screen windows vs the rest of the ad after removing the linear trend; p from circular shifts (≥ 4 s). Repeat test: correlation of the two viewings' timelines.</li></ul></div></div>
+    <div class="section-title" style="margin-top:16px">Exact values per scene · first viewing, change vs rest · “normal” = what this viewer's own rest produces for a stretch this long</div>
+    <div style="overflow:auto"><table class="tbl"><thead><tr><th>#</th><th>Time</th><th>Scene</th>${ORDER.map(m => `<th>${NAME[m]}</th>`).join("")}</tr></thead><tbody>${(vw.scenes || []).map(sc =>
+      `<tr><td>${sc.idx + 1}</td><td class="num">${fmtT(sc.start_s)}–${fmtT(sc.end_s)}</td><td>${esc(sc.label)}</td>${ORDER.map(m => { const v = sc.values[m]; if (!v) return "<td>–</td>";
+        if ((v.verdict || "").startsWith("too")) return '<td class="muted">too noisy</td>';
+        if (v.value == null) return '<td class="muted">not measurable</td>';
+        const up = v.verdict.startsWith("above"), dn = v.verdict.startsWith("below");
+        return `<td class="num"><b>${fmtV(m, v.value)}</b><div class="tiny ${up || dn ? "" : "muted"}" style="${up ? "color:var(--good)" : dn ? "color:var(--bad)" : ""}">${up ? "higher than at rest" : dn ? "lower than at rest" : "same as at rest"}</div>${v.rest_lo == null ? "" : `<div class="tiny muted">normal: ${fmtV(m, v.rest_lo)} to ${fmtV(m, v.rest_hi)}</div>`}</td>`; }).join("")}</tr>`).join("")}</tbody></table></div>`;
+}
+
+// ------------------------------------------------------------------ compare two ads, same viewer
+let SESS = null, CMP = { ad: null, data: null };
+async function renderCompare() {
+  const s = techViewer(), body = $("cmpBody");
+  if (!s) { body.innerHTML = '<span class="muted">No recording yet.</span>'; return; }
+  if (!SESS) SESS = await getJ("/api/sessions");
+  const mine = ((SESS.find(v => v.session === s) || {}).ads || []).filter(a => a !== AD);
+  if (!mine.length) { body.innerHTML = `<span class="muted">Viewer ${esc(s)} has watched only this ad. Record them on a second ad to compare.</span>`; return; }
+  if (!mine.includes(CMP.ad)) CMP = { ad: mine[0], data: null };
+  if (!CMP.data || CMP.data.session !== s) CMP.data = await getJ(`/api/analysis/${CMP.ad}?session=${encodeURIComponent(s)}`);
+  const A = VIEW[s], B = CMP.data, nm = d => `${d.ad.brand || d.ad.ad} (${Math.round(d.ad.duration_s)} s)`;
+  const val = (d, m) => { const x = (d.ad_detail || {})[m] || {}; return (x.verdict || "").startsWith("too") ? "noisy" : x.value; };
+  const rate = (d, k) => d.ratings && d.ratings[k] != null ? d.ratings[k] + " / 9" : "–";
+  body.innerHTML = `<div class="row" style="margin-bottom:12px;flex-wrap:wrap"><span>Viewer <b>${esc(s)}</b>${SCOPE === "all" ? ' <span class="muted">(choose another viewer at the top)</span>' : ""} · this ad compared with</span>
+      <select id="cmpSel">${mine.map(a => { const x = D.all_ads.find(q => q.ad === a) || {}; return `<option value="${a}" ${a === CMP.ad ? "selected" : ""}>${esc(x.brand || a)}</option>`; }).join("")}</select></div>
+    <table class="tbl"><thead><tr><th>Whole ad, change vs this viewer's rest</th><th>${esc(nm(A))}</th><th>${esc(nm(B))}</th><th>Difference</th></tr></thead><tbody>
+      ${ORDER.map(m => { const a = val(A, m), b = val(B, m), ok = typeof a === "number" && typeof b === "number";
+        return `<tr><td><b style="color:${css(m)}">${NAME[m]}</b></td><td class="num">${typeof a === "number" ? fmtV(m, a) : a === "noisy" ? "too noisy" : "–"}</td><td class="num">${typeof b === "number" ? fmtV(m, b) : b === "noisy" ? "too noisy" : "–"}</td><td class="num">${ok ? fmtV(m, a - b) : "–"}</td></tr>`; }).join("")}
+      <tr><td>Liked the ad</td><td class="num">${rate(A, "liking")}</td><td class="num">${rate(B, "liking")}</td><td></td></tr>
+      <tr><td>Would buy</td><td class="num">${rate(A, "purchase_intent")}</td><td class="num">${rate(B, "purchase_intent")}</td><td></td></tr>
+      ${[A, B].some(d => d.ratings && d.ratings.feeling_valence != null) ? `<tr><td>Feeling (unpleasant – pleasant)</td><td class="num">${rate(A, "feeling_valence")}</td><td class="num">${rate(B, "feeling_valence")}</td><td></td></tr><tr><td>Calm – excited</td><td class="num">${rate(A, "feeling_arousal")}</td><td class="num">${rate(B, "feeling_arousal")}</td><td></td></tr>` : ""}</tbody></table>
+    <div class="section-title" style="margin-top:16px">Second by second, same scale for both ads</div>
+    <div class="objgrid">${[A, B].map((d, k) => `<div><div class="small" style="font-weight:600;margin-bottom:4px">${esc(nm(d))}</div><canvas class="cmpcv" data-k="${k}" style="width:100%;height:${ORDER.length * 62}px;display:block"></canvas></div>`).join("")}</div>
+    <div class="tiny muted" style="margin-top:10px">Same person and same resting baseline, so levels are comparable; the ads differ in length and content, and this is one viewer — a description, not a ranking of the ads.</div>`;
+  $("cmpSel").onchange = e => { CMP = { ad: e.target.value, data: null }; renderCompare(); };
+  const lims = {}; ORDER.forEach(m => { const v = [A, B].flatMap(d => ((d.timeline || {})[m] || []).map(p => p[1]).filter(x => x != null)).map(Math.abs).sort((x, y) => x - y); lims[m] = v.length ? v[Math.floor(v.length * .96)] * 1.15 || 1 : 1; });
+  document.querySelectorAll(".cmpcv").forEach(c => { const d = [A, B][+c.dataset.k], W = c.clientWidth, H = c.clientHeight, dpr = devicePixelRatio || 1, x = c.getContext("2d");
+    c.width = W * dpr; c.height = H * dpr; x.setTransform(dpr, 0, 0, dpr, 0, 0); x.textBaseline = "middle";
+    ORDER.forEach((m, i) => { const y0 = i * 62 + 14, h = 44, mid = y0 + h / 2, pts = (d.timeline || {})[m] || [], dd = d.ad.duration_s;
+      x.fillStyle = css(m); x.font = `600 10.5px ${FONT}`; x.fillText(NAME[m], 0, y0 - 7);
+      x.strokeStyle = css("line-2"); x.lineWidth = 1; x.beginPath(); x.moveTo(0, mid + .5); x.lineTo(W, mid + .5); x.stroke();
+      if (!pts.some(p => p[1] != null)) { x.fillStyle = css("muted"); x.font = `11px ${FONT}`; x.fillText("not measurable", 90, y0 - 7); return; }
+      x.strokeStyle = css(m); x.lineWidth = 1.6; x.beginPath(); let pen = false;
+      pts.forEach(p => { if (p[1] == null) { pen = false; return; } const px = W * p[0] / dd, py = mid - Math.max(-1, Math.min(1, p[1] / lims[m])) * (h / 2); pen ? x.lineTo(px, py) : x.moveTo(px, py); pen = true; }); x.stroke(); }); });
+}
+document.getElementById("dCompare").addEventListener("toggle", e => { if (e.target.open) renderCompare(); });
+
+function renderGuide() {
+  const g = (INS && INS.guide) || {};
+  $("guideBody").innerHTML = `<table class="tbl"><thead><tr><th>Measure</th><th>When it is high</th><th>When it is low</th><th>Keep in mind</th></tr></thead><tbody>` +
+    ORDER.map(m => g[m] ? `<tr><td><b style="color:${css(m)}">${NAME[m]}</b></td><td>${esc(g[m].high)}</td><td>${esc(g[m].low)}</td><td class="muted">${esc(g[m].note)}</td></tr>` : "").join("") +
+    `</tbody></table><div class="small muted" style="padding:10px">Every line is drawn relative to that viewer's own typical level for this ad, so viewers can be compared. Stretches with too much electrical noise are left blank.</div>`;
+}
+
+// ------------------------------------------------------------------ copilot
+$("askBtn").onclick = () => { $("ask").classList.add("open"); $("q").focus(); };
+$("askClose").onclick = () => $("ask").classList.remove("open");
+async function resetChat() {
+  $("chat").innerHTML = `<div class="muted">Ask about this ad. Answers use only this study's data, and every number is checked against it.</div><div class="sugg" id="sugg"></div>`;
+  try { const j = await getJ(`/api/copilot/suggest/${AD}`); $("sugg").innerHTML = (j.questions || []).map(q => `<button>${esc(q)}</button>`).join(""); } catch (e) {}
+}
+$("chat").addEventListener("click", e => { const s = e.target.closest(".sugg button"); if (s) return askQ(s.textContent);
+  const b = e.target.closest(".tbtn"); if (b) goTo(b.dataset.ad || AD, +b.dataset.t); });
+// a time chip may point at another ad: open that ad (chat kept), then jump
+async function goTo(ad, t) {
+  if (ad !== AD) { $("adSel").value = ad; await loadAd(ad, true); }
+  if (vid.readyState < 1) await new Promise(r => vid.addEventListener("loadedmetadata", r, { once: true }));
+  seek(t); vid.play();
+}
+const adName = a => { const x = ((D && D.all_ads) || []).find(q => q.ad === a); return x ? (x.brand || a) : a; };
+const chip = (ad, t) => `<button class="tbtn" data-ad="${ad}" data-t="${t}">▶ ${ad !== AD ? esc(adName(ad)) + " " : ""}${fmtT(+t)}</button>`;
+function renderAnswer(text) {
+  return esc(text).split(/\n+/).map(l => l.trim()).filter(Boolean).map(l =>
+    `<p>${l.replace(/\[(?:(ad\d+)\s*,?\s*)?t\s*=\s*(\d+(?:\.\d+)?)\s*s?\]/gi, (_, a, t) => chip(a ? a.toLowerCase() : AD, t))}</p>`).join("");
+}
+function addMsg(cls, html) { const d = document.createElement("div"); d.className = "msg " + cls; d.innerHTML = html; $("chat").appendChild(d); $("chat").scrollTop = 1e9; return d; }
+async function askQ(q) {
+  q = q.trim(); if (!q || !D) return;
+  addMsg("user", esc(q)); $("q").value = "";
+  const wait = addMsg("bot", `<span class="dots"><span></span><span></span><span></span></span> <span class="small muted">looking at the data…</span>`);
+  try {
+    const j = await (await fetch("/api/copilot", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: q, history: chatHist, context: { ad: AD, t: vid.currentTime, session: SCOPE === "all" ? null : SCOPE } }) })).json();
+    wait.remove();
+    if (j.error) { addMsg("err", esc(j.error)); return; }
+    const bad = j.unverified_numbers && j.unverified_numbers.length;
+    addMsg("bot", renderAnswer(j.answer) + `<div class="meta"><span>${j.offline ? "offline answer from stored findings" : bad ? "⚠ unchecked: " + j.unverified_numbers.map(esc).join(", ") : "✓ numbers checked against the data"}</span>${j.cached ? "<span>saved answer</span>" : ""}</div>`);
+    const other = [];
+    (j.actions || []).forEach(a => { if (!a.seek) return; if (a.seek.ad === AD) seek(a.seek.t); else other.push(a.seek); });
+    if (other.length) $("chat").lastElementChild.insertAdjacentHTML("beforeend", `<div class="meta">${other.map(x => chip(x.ad, x.t)).join(" ")}</div>`);
+    chatHist.push({ role: "user", content: q }, { role: "assistant", content: j.answer }); chatHist = chatHist.slice(-8);
+  } catch (e) { wait.remove(); addMsg("err", "Could not reach the app server."); }
+}
+$("askForm").addEventListener("submit", e => { e.preventDefault(); askQ($("q").value); });
+
+// ------------------------------------------------------------------ start
+(async () => {
+  if (AD) return loadAd(AD);
+  const j = await getJ("/api/analysis/ad01");
+  const withData = (j.all_ads || []).filter(a => a.n > 0);
+  loadAd((withData.find(a => a.n > 1) || withData[0] || (j.all_ads || [{ ad: "ad01" }])[0]).ad);
+})();
+</script>
+</body>
+</html>

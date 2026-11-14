@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Record · Ad Copilot</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/shell.js"></script>
+<style>
+.wrap { max-width: 1120px; margin: 0 auto; padding: 22px 20px 120px; display: flex; flex-direction: column; gap: 18px; }
+.page-h h1 { font-size: 22px; } .page-h p { margin: 4px 0 0; color: var(--ink-2); }
+.step { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 14px; }
+.step .no { width: 30px; height: 30px; border-radius: 50%; background: var(--accent-weak); color: var(--accent); font-weight: 700; display: grid; place-items: center; margin-top: 14px; }
+.step .no.done { background: var(--good-weak); color: var(--good); }
+.row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 820px) { .grid2 { grid-template-columns: 1fr; } }
+.switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+.switch input { display: none; }
+.switch .tr { width: 38px; height: 22px; border-radius: 99px; background: var(--line-2); position: relative; transition: background .15s; flex: none; }
+.switch .tr::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .15s; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+.switch input:checked + .tr { background: var(--accent); }
+.switch input:checked + .tr::after { left: 19px; }
+/* ads */
+.applyall { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 16px; background: var(--surface-2); border-bottom: 1px solid var(--line); }
+.ads { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; padding: 16px; }
+.ad { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--surface); display: flex; flex-direction: column; transition: opacity .15s, border-color .15s; }
+.ad.off { opacity: .5; }
+.ad.on { border-color: var(--accent); }
+.ad .img { position: relative; }
+.ad img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; background: #000; }
+.ad .ord { position: absolute; left: 8px; top: 8px; min-width: 24px; height: 24px; border-radius: 99px; background: rgba(0,0,0,.7); color: #fff; font-size: 12px; font-weight: 700; display: grid; place-items: center; padding: 0 7px; }
+.ad .tog { position: absolute; right: 8px; top: 8px; }
+.ad .dur { position: absolute; right: 8px; bottom: 8px; font-size: 11.5px; font-weight: 600; padding: 2px 7px; border-radius: 99px; background: rgba(0,0,0,.65); color: #fff; }
+.ad .b { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+.ad .t { font-weight: 650; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.ad .p { font-size: 12px; color: var(--muted); }
+.ad .qs { display: flex; flex-wrap: wrap; gap: 5px; }
+.ad .qs .chip { font-size: 11.5px; padding: 3px 9px; }
+.ad .mv { display: flex; gap: 4px; }
+/* questions */
+.qrow { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px dashed var(--line); }
+.qrow:last-child { border-bottom: 0; }
+.qrow .txt { flex: 1; } .qrow .txt b { font-size: 13px; } .qrow .txt div { font-size: 12px; color: var(--muted); }
+/* preflight */
+.check { display: flex; gap: 10px; align-items: flex-start; padding: 9px 0; cursor: pointer; }
+.check input { width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--good); flex: none; }
+.check .txt b { display: block; font-size: 13px; } .check .txt span { font-size: 12px; color: var(--muted); }
+.eeg { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); margin-top: 6px; }
+.led { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex: none; }
+.led.good { background: var(--good); box-shadow: 0 0 0 4px var(--good-weak); } .led.bad { background: var(--bad); box-shadow: 0 0 0 4px var(--bad-weak); }
+/* sticky action bar */
+.actionbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(10px); border-top: 1px solid var(--line); }
+.actionbar .in { max-width: 1120px; margin: 0 auto; padding: 12px 20px; display: flex; align-items: center; gap: 12px; }
+.actionbar .sum { flex: 1; min-width: 0; }
+.actionbar .sum b { font-size: 14px; } .actionbar .sum div { font-size: 12px; color: var(--muted); }
+.problems { margin: 0; padding: 10px 14px 10px 30px; background: var(--bad-weak); color: var(--bad); border-radius: 10px; font-size: 13px; }
+/* run status */
+.run { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.phases { display: flex; gap: 8px; flex-wrap: wrap; }
+.phase { font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 99px; background: var(--surface-2); color: var(--muted); }
+.phase.done { background: var(--good-weak); color: var(--good); } .phase.now { background: var(--accent-weak); color: var(--accent); }
+.progress { height: 8px; background: var(--surface-3); border-radius: 8px; overflow: hidden; }
+.progress i { display: block; height: 100%; background: var(--accent); border-radius: 8px; transition: width .4s; }
+.result { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 14px 16px; border-radius: 12px; background: var(--accent-weak); }
+.result .txt { flex: 1; min-width: 220px; } .result .txt b { display: block; font-size: 14px; } .result .txt span { font-size: 12.5px; color: var(--ink-2); }
+.result.done { background: var(--good-weak); } .result.fail { background: var(--bad-weak); }
+.spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--accent); border-right-color: transparent; animation: sp .8s linear infinite; display: inline-block; vertical-align: -3px; margin-right: 6px; }
+@keyframes sp { to { transform: rotate(360deg); } }
+.vrow { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.vrow:last-child { border-bottom: 0; }
+.vrow .id { font-weight: 700; min-width: 90px; } .vrow .info { flex: 1; font-size: 12.5px; color: var(--ink-2); }
+pre.log { background: #0e1116; color: #c5cdd9; border-radius: 10px; padding: 12px; font-size: 12px; max-height: 240px; overflow: auto; white-space: pre-wrap; margin: 0; }
+</style>
+</head>
+<body>
+<div class="pagehead"><h1>Record</h1><span class="sub">Choose the viewer, the ads and the questions, check the cap, then start. The task window opens on this laptop.</span></div>
+
+<div class="wrap">
+  
+  <section class="card hidden" id="runCard">
+    <div class="card-h"><h2 id="runTitle">Recording</h2><span id="runBadge" class="badge"></span></div>
+    <div class="run">
+      <div class="phases" id="phases"></div>
+      <div class="progress"><i id="bar" style="width:0%"></i></div>
+      <div class="small ink2" id="runMsg"></div>
+      <div class="result hidden" id="resultBox"></div>
+      <details><summary class="small muted" style="cursor:pointer">Technical log</summary><pre class="log" id="log"></pre></details>
+    </div>
+  </section>
+
+  <div class="step">
+    <div class="no" id="n1">1</div>
+    <section class="card">
+      <div class="card-h"><h2>Viewer</h2><span class="small muted">Use a code, never a name</span></div>
+      <div class="card-b grid2">
+        <div class="field"><label for="pid">Viewer ID</label>
+          <div class="row"><input type="text" id="pid" placeholder="p02" style="width:140px"><span id="pidMsg" class="small"></span></div>
+          <label class="switch small hidden" id="ovWrap" style="font-weight:500;color:var(--warn)"><input type="checkbox" id="overwrite"><span class="tr"></span>Replace the existing recording with this ID</label>
+        </div>
+        <div class="field"><label for="notes">Notes (optional)</label><textarea id="notes" rows="2" placeholder="Cap contact, anything unusual…"></textarea></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="step">
+    <div class="no" id="n2">2</div>
+    <section class="card">
+      <div class="card-h">
+        <h2>Ads and questions</h2>
+        <div class="row">
+          <span class="small muted">Order</span>
+          <div class="seg" id="orderSeg"><button data-o="random" class="on">Random</button><button data-o="fixed">Fixed</button></div>
+        </div>
+      </div>
+      <div class="applyall"><span class="small ink2" style="font-weight:600">Ask after every ad:</span><span id="allQs" style="display:contents"></span></div>
+      <div id="labelBar" class="hidden" style="padding:12px 16px;background:var(--warn-weak);border-bottom:1px solid var(--line)"></div>
+      <div class="ads" id="ads"></div>
+    </section>
+  </div>
+
+  <div class="step">
+    <div class="no" id="n3">3</div>
+    <section class="grid2">
+      <div class="card">
+        <div class="card-h"><h2>Session</h2></div>
+        <div class="card-b" style="display:flex;flex-direction:column;gap:14px">
+          <label class="switch"><input type="checkbox" id="baseline" checked><span class="tr"></span><span><b>Resting baseline first</b><br><span class="small muted">60 s eyes open + 60 s eyes closed. Every measure is compared with it — keep it on.</span></span></label>
+          <label class="switch"><input type="checkbox" id="twice" checked><span class="tr"></span><span><b>Show each ad twice</b><br><span class="small muted">Second round in a new order. A pattern counts as reliable for this viewer only if it repeats — the single-person stand-in for comparing many viewers. Questions are asked after the first showing only.</span></span></label>
+          <div class="small ink2">Each ad: 4 s fixation cross → ad → 3 s grey screen → its questions. <b>Brand recall</b> is asked at the very end (after every showing), with a still frame from the ad.</div>
+          <details>
+            <summary class="small" style="cursor:pointer;font-weight:600">Question bank · add a question</summary>
+            <div id="qlist" style="margin-top:6px"></div>
+            <div class="field" style="margin-top:10px"><label>New question</label>
+              <input type="text" id="qText" placeholder="e.g. How much do you trust this brand?">
+              <div class="row"><select id="qType"><option value="scale9">1–9 scale</option><option value="yesno">Yes / No</option></select>
+              <input type="text" id="qAnchors" placeholder="Scale labels (optional)" style="flex:1"><button class="btn sm" id="qAdd">Add</button></div>
+              <div id="qMsg" class="small"></div></div>
+          </details>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h2>Before you start</h2><span class="small muted" id="checkCount"></span></div>
+        <div class="card-b">
+          <label class="check"><input type="checkbox" class="pf"><span class="txt"><b>EEGStudio is streaming</b><span>Acquisition running · LSL Outlet on · data type “Raw data (in µV)”</span></span></label>
+          <label class="check"><input type="checkbox" class="pf"><span class="txt"><b>Cap contact checked</b><span>REF and GND touching skin; green in EEGStudio: Fp1, Fp2, F3, F4, Fz, Cz (asymmetry · processing · alertness) and Pz, P3, P4, O1, O2 (attention)</span></span></label>
+          <label class="check"><input type="checkbox" class="pf"><span class="txt"><b>Viewer briefed</b><span>Sit still, relax the jaw · answer with 1–9 or Y/N · ESC stops safely</span></span></label>
+          <div class="eeg"><span class="led" id="eegLed"></span><span class="small" id="eegMsg" style="flex:1">Cap contact not checked yet</span><button class="btn sm primary" id="capBtn">Check cap contact</button></div>
+          <div id="capBox" class="hidden" style="display:flex;gap:16px;align-items:center;margin-top:12px">
+            <svg id="capSvg" viewBox="0 0 200 200" style="width:190px;flex:none"></svg>
+            <div class="small" id="capList" style="flex:1"></div>
+          </div>
+          <span class="hidden"><button id="eegBtn"></button></span>
+        </div>
+      </div>
+    </section>
+  </div>
+  <ul class="problems hidden" id="problems"></ul>
+
+  <section class="card" id="viewersCard">
+    <div class="card-h"><h2>Recorded viewers</h2><span class="small muted">Analyse a recording, then open its results</span></div>
+    <div id="viewers"></div>
+  </section>
+</div>
+
+<div class="actionbar">
+  <div class="in">
+    <div class="sum"><b id="sumTitle">-</b><div id="sumSub">-</div></div>
+    <button class="btn" id="saveBtn">Save setup</button>
+    <button class="btn primary lg" id="startBtn">Start recording</button>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+let ADS = [], BANK = [], DEFAULTS = [], SESSIONS = [], ORDERMODE = "random", rows = [];
+const qName = id => (BANK.find(q => q.id === id) || {}).text || id;
+const qShort = id => ({ liking: "Liking", purchase_intent: "Would buy", brand_impression: "Brand impression", feeling_valence: "Feeling (unpleasant–pleasant)", feeling_arousal: "Feeling (calm–excited)", seen_before: "Seen before", brand_recall: "Brand recall" }[id] || id.replace(/_/g, " "));
+const qType = id => (BANK.find(q => q.id === id) || {}).type;
+const canAsk = (a, id) => qType(id) !== "brand_choice" || (a && a.recall_ready);
+const fmtDur = s => s == null ? "?" : s >= 60 ? `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}` : `${Math.round(s)} s`;
+
+function nextId() { let k = 1; while (SESSIONS.includes("p" + String(k).padStart(2, "0"))) k++; return "p" + String(k).padStart(2, "0"); }
+function checkPid() {
+  const v = $("pid").value.trim(), m = $("pidMsg");
+  $("ovWrap").classList.toggle("hidden", !SESSIONS.includes(v));
+  if (!v) { m.innerHTML = ""; return false; }
+  if (!/^[A-Za-z0-9_-]+$/.test(v)) { m.innerHTML = '<span class="badge bad">letters, digits, _ or - only</span>'; return false; }
+  if (SESSIONS.includes(v)) { m.innerHTML = '<span class="badge warn">already recorded</span>'; return $("overwrite").checked; }
+  m.innerHTML = '<span class="badge good">new viewer</span>'; return true;
+}
+function renderAds() {
+  $("allQs").innerHTML = BANK.map(q => {
+    const inc = rows.filter(r => r.include && canAsk(ADS.find(x => x.file === r.file), q.id)), on = inc.length && inc.every(r => r.questions.has(q.id));
+    return `<button class="chip ${on ? "on" : ""}" data-all="${q.id}" title="${esc(q.text)}">${esc(qShort(q.id))}${q.type === "yesno" ? " (Y/N)" : q.type === "brand_choice" ? " (at end)" : ""}</button>`;
+  }).join("");
+  let k = 0;
+  $("ads").innerHTML = rows.map((r, i) => {
+    const a = ADS.find(x => x.file === r.file) || {}; if (r.include) k++;
+    return `<div class="ad ${r.include ? "on" : "off"}" data-i="${i}">
+      <div class="img"><img loading="lazy" src="/api/thumb/${a.ad}?t=${((a.duration_s || 10) * 0.45).toFixed(1)}&w=420" alt="">
+        ${r.include && ORDERMODE === "fixed" ? `<span class="ord">${k}</span>` : ""}
+        <label class="switch tog" title="Show this ad"><input type="checkbox" data-inc ${r.include ? "checked" : ""}><span class="tr"></span></label>
+        <span class="dur">${fmtDur(a.duration_s)}</span></div>
+      <div class="b">
+        <div class="t"><span>${esc(a.brand || a.ad)}</span><span class="badge ${a.scenes_status === "reviewed" ? "good" : a.scenes_status ? "" : "warn"}">${a.scenes_status === "reviewed" ? "scenes reviewed" : a.scenes_status ? "scenes draft" : "not labelled"}</span></div>
+        <div class="p">${esc(a.ad)} · ${esc(a.product || "")}</div>
+        <div class="qs">${BANK.map(q => { const ok = canAsk(a, q.id);
+          return `<button class="chip ${r.questions.has(q.id) ? "on" : ""}" data-q="${q.id}" ${r.include && ok ? "" : "disabled"} title="${ok ? esc(q.text) : "Needs an ad profile with the brand and answer options (data/lab_session/ad_profiles)"}">${esc(qShort(q.id))}</button>`; }).join("")}</div>
+        ${ORDERMODE === "fixed" ? `<div class="mv"><button class="btn sm ghost" data-up ${i === 0 ? "disabled" : ""}>↑ earlier</button><button class="btn sm ghost" data-down ${i === rows.length - 1 ? "disabled" : ""}>↓ later</button></div>` : ""}
+      </div></div>`;
+  }).join("");
+  $("qlist").innerHTML = BANK.map(q => `<div class="qrow"><span class="badge ${q.type === "yesno" ? "info" : q.type === "brand_choice" ? "warn" : "accent"}">${q.type === "yesno" ? "Y / N" : q.type === "brand_choice" ? "Choice · end" : "1–9"}</span><div class="txt"><b>${esc(q.text)}</b><div>${esc(q.anchors)}</div></div>${q.custom ? '<span class="badge">custom</span>' : ""}</div>`).join("");
+  summary();
+}
+function summary() {
+  const inc = rows.filter(r => r.include);
+  let s = $("baseline").checked ? 150 : 0;
+  const views = $("twice").checked ? 2 : 1;
+  inc.forEach(r => { const a = ADS.find(x => x.file === r.file) || {}; s += views * ((a.duration_s || 60) + 7) + 6 * r.questions.size; });
+  s += 20;
+  const nq = new Set(inc.flatMap(r => [...r.questions])).size;
+  $("sumTitle").textContent = `${$("pid").value.trim() || "–"} · ${inc.length} ad${inc.length === 1 ? "" : "s"}${views === 2 ? " × 2" : ""} · about ${Math.max(1, Math.round(s / 60))} min`;
+  $("sumSub").textContent = `${ORDERMODE === "random" ? "Random order" : "Fixed order"} · ${views === 2 ? "each shown twice · " : ""}${nq} question${nq === 1 ? "" : "s"} · baseline ${$("baseline").checked ? "on" : "off"}`;
+  const pf = [...document.querySelectorAll(".pf")].filter(x => x.checked).length;
+  $("checkCount").textContent = `${pf} of 3 done`;
+  $("n1").classList.toggle("done", checkPid());
+  $("n2").classList.toggle("done", inc.length > 0 && inc.every(r => r.questions.size));
+  $("n3").classList.toggle("done", pf === 3);
+}
+$("ads").addEventListener("click", e => {
+  const card = e.target.closest(".ad"); if (!card) return;
+  const i = +card.dataset.i, r = rows[i];
+  const q = e.target.closest("[data-q]");
+  if (q) { r.questions.has(q.dataset.q) ? r.questions.delete(q.dataset.q) : r.questions.add(q.dataset.q); return renderAds(); }
+  if (e.target.closest("[data-up]") && i > 0) { [rows[i - 1], rows[i]] = [rows[i], rows[i - 1]]; return renderAds(); }
+  if (e.target.closest("[data-down]") && i < rows.length - 1) { [rows[i + 1], rows[i]] = [rows[i], rows[i + 1]]; return renderAds(); }
+});
+$("ads").addEventListener("change", e => { if (e.target.hasAttribute("data-inc")) { rows[+e.target.closest(".ad").dataset.i].include = e.target.checked; renderAds(); } });
+$("allQs").addEventListener("click", e => {
+  const b = e.target.closest("[data-all]"); if (!b) return;
+  const inc = rows.filter(r => r.include), on = inc.every(r => r.questions.has(b.dataset.all));
+  inc.forEach(r => on ? r.questions.delete(b.dataset.all) : r.questions.add(b.dataset.all)); renderAds();
+});
+$("orderSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; ORDERMODE = b.dataset.o; [...$("orderSeg").children].forEach(x => x.classList.toggle("on", x === b)); renderAds(); });
+["pid", "overwrite", "baseline", "twice"].forEach(id => $(id).addEventListener("input", summary));
+document.querySelectorAll(".pf").forEach(x => x.addEventListener("change", summary));
+
+$("qAdd").onclick = async () => {
+  const r = await fetch("/api/questions", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: $("qText").value, type: $("qType").value, anchors: $("qAnchors").value }) });
+  const j = await r.json();
+  if (!j.ok) { $("qMsg").innerHTML = `<span class="flag" style="color:var(--bad)">${esc(j.error)}</span>`; return; }
+  BANK = j.bank; $("qText").value = $("qAnchors").value = "";
+  $("qMsg").innerHTML = `<span style="color:var(--good)">Added. Tick it on the ads that should ask it.</span>`; renderAds();
+};
+$("eegBtn").onclick = async () => {
+  $("eegMsg").textContent = "Looking for EEG streams…"; $("eegLed").className = "led";
+  const j = await (await fetch("/api/eeg_check")).json();
+  const fake = j.ok && j.streams.some(s => /fake/i.test(s.name));
+  $("eegLed").className = "led " + (j.ok && !fake ? "good" : "bad");
+  $("eegMsg").innerHTML = j.ok ? (fake ? '<b style="color:var(--bad)">A test stream is running — stop it before recording.</b> ' : "<b>Found:</b> ") +
+    j.streams.map(s => `${esc(s.name)} · ${s.channels} ch · ${s.rate} Hz`).join(", ") : esc(j.error || "No EEG stream. In EEGStudio: start acquisition and turn on LSL Outlet.");
+};
+
+function config() {
+  return { participant_id: $("pid").value.trim(), order: ORDERMODE, viewings: $("twice").checked ? 2 : 1,
+    baseline: $("baseline").checked, notes: $("notes").value,
+    ads: rows.filter(r => r.include).map(r => { const a = ADS.find(x => x.file === r.file);
+      return { file: r.file, questions: BANK.map(q => q.id).filter(q => r.questions.has(q) && canAsk(a, q)) }; }) };
+}
+let LABELLING = false, LABEL_DONE_SHOWN = false;
+async function labelStatus() {
+  const j = await (await fetch("/api/label/status")).json(), bar = $("labelBar");
+  const unl = j.unlabelled || [];
+  LABELLING = j.state === "running";
+  bar.classList.toggle("hidden", !unl.length && j.state === "idle");
+  if (j.state === "running") {
+    bar.innerHTML = `<span class="spin"></span><b>Labelling ${j.ads.map(esc).join(", ")}…</b> <span class="small muted">about 2 minutes per ad. ${esc((j.log || []).slice(-1)[0] || "")}</span>`;
+    setTimeout(labelStatus, 3000);
+  } else if (j.state === "failed") {
+    bar.innerHTML = `<b style="color:var(--bad)">Labelling failed.</b> <span class="small">${(j.log || []).map(esc).join("<br>")}</span>`;
+  } else if (j.state === "finished" && !unl.length) {
+    bar.innerHTML = `<b style="color:var(--good)">Labelled ${j.ads.map(esc).join(", ")}.</b> <span class="small">They are AI drafts — check them in <a href="/review">Scene review</a>.</span>`;
+    bar.style.background = "var(--good-weak)";
+    if (!LABEL_DONE_SHOWN) { LABEL_DONE_SHOWN = true; ADS = (await (await fetch("/api/setup")).json()).ads; renderAds(); }
+  } else if (unl.length) {
+    bar.style.background = "var(--warn-weak)";
+    bar.innerHTML = `<b>${unl.length} ad${unl.length === 1 ? "" : "s"} not labelled yet:</b> ${unl.map(esc).join(", ")}
+      <span class="small muted">Needed for scene-level results. Uses OpenAI (about 2 min and a few cents per ad).</span>
+      <select id="labLang" style="margin:0 6px"><option value="en">Spoken: English</option><option value="hi">Hindi</option><option value="">Auto-detect</option></select>
+      <button class="btn sm primary" id="labBtn">Label ${unl.length === 1 ? "this ad" : "all " + unl.length}</button>`;
+    $("labBtn").onclick = async () => {
+      if (!confirm(`Label ${unl.join(", ")} now? This sends frames and audio to OpenAI and uses credit.`)) return;
+      const r = await (await fetch("/api/label", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ads: unl, language: $("labLang").value }) })).json();
+      if (!r.ok) alert(r.error); labelStatus();
+    };
+  }
+}
+async function submit(start) {
+  $("problems").classList.add("hidden");
+  if (start && (!CAP || !CAP.ok || !CAP.ready) && !confirm(CAP && CAP.ok ? "The cap check says it is NOT ready:\n" + CAP.message + "\n\nRecord anyway?" : "The cap contact has not been checked (or the check failed).\n\nRecord anyway?")) return;
+  if (start && !confirm(`Start recording "${$("pid").value.trim()}" now?\nThe task window will open on this laptop.`)) return;
+  const r = await fetch("/api/session", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ config: config(), start, overwrite: $("overwrite").checked }) });
+  const j = await r.json();
+  if (!j.ok) { $("problems").innerHTML = (j.problems || [j.error]).map(p => `<li>${esc(p)}</li>`).join(""); $("problems").classList.remove("hidden"); return; }
+  if (!start) { $("sumSub").textContent = "Saved " + j.config; return; }
+  poll();
+}
+$("saveBtn").onclick = () => submit(false);
+$("startBtn").onclick = () => submit(true);
+
+let timer = null;
+async function poll() {
+  clearTimeout(timer);
+  const s = await (await fetch("/api/session/status")).json();
+  showRun(s);
+  if (s.state === "running") timer = setTimeout(poll, 1500); else if (s.state !== "idle") load(true);
+}
+function showRun(s) {
+  if (s.state === "idle") return;
+  $("runCard").classList.remove("hidden");
+  const p = s.progress || {}, planned = p.planned || 0;
+  $("runTitle").textContent = `Recording ${s.participant_id}`;
+  $("runBadge").className = "badge " + ({ running: "accent", finished: "good", failed: "bad" }[s.state] || "");
+  $("runBadge").textContent = { running: "in progress", finished: "finished", failed: "stopped with an error" }[s.state];
+  const ph = [["Baseline · eyes open", p.baseline_eo], ["Baseline · eyes closed", p.baseline_ec]];
+  for (let i = 0; i < planned; i++) ph.push([`Ad ${i + 1}`, i < p.ads_done]);
+  const nowIdx = ph.findIndex(x => !x[1]);
+  $("phases").innerHTML = ph.map(([t, d], i) => `<span class="phase ${d ? "done" : s.state === "running" && i === nowIdx ? "now" : ""}">${d ? "✓ " : ""}${t}</span>`).join("");
+  const total = ph.length || 1, done = ph.filter(x => x[1]).length;
+  $("bar").style.width = (s.state === "finished" ? 100 : 100 * done / total) + "%";
+  $("runMsg").innerHTML = s.state === "running" ? (p.current ? `Playing <b>${esc(p.current)}</b>. Press ESC in the task window to stop early — data is still saved.` : "Running — follow the task window.")
+    : s.state === "finished" ? `Saved: ${s.files.map(esc).join(", ")}. Next: open the <a href="/results">Ad report</a> after the database is rebuilt.`
+    : `Stopped (code ${s.returncode}). Saved so far: ${s.files.map(esc).join(", ") || "nothing"}. See the technical log.`;
+  $("log").textContent = (s.log || []).join("\n"); $("log").scrollTop = 1e9;
+  $("startBtn").disabled = s.state === "running";
+  const rb = $("resultBox");
+  if (s.state === "running") { rb.classList.add("hidden"); delete rb.dataset.pid; }
+  else if (s.files && s.files.includes(`${s.participant_id}_raw.fif`) && !rb.dataset.pid) {
+    rb.dataset.pid = s.participant_id; rb.className = "result";
+    rb.innerHTML = `<div class="txt"><b>Recording saved. Ready to analyse ${esc(s.participant_id)}.</b><span>Cleans the signal, maps every scene to its EEG and computes the measures — about a minute.</span></div>
+      <button class="btn primary lg" data-analyse="${esc(s.participant_id)}">Analyse &amp; view results</button>`;
+  }
+}
+
+// ------------------------------------------------------------------ cap contact check
+const POS = { Fp1: [75, 30], Fp2: [125, 30], F7: [40, 65], F3: [72, 68], Fz: [100, 70], F4: [128, 68], F8: [160, 65], T3: [22, 100], C3: [60, 100], Cz: [100, 100], C4: [140, 100], T4: [178, 100], T5: [40, 135], P3: [72, 132], Pz: [100, 130], P4: [128, 132], T6: [160, 135], O1: [75, 170], O2: [125, 170] };
+let CAP = null;
+$("capBtn").onclick = async () => {
+  $("capBtn").disabled = true; $("eegLed").className = "led"; $("eegMsg").innerHTML = '<span class="spin"></span>Reading the cap for 8 seconds — keep still…';
+  let j; try { j = await (await fetch("/api/contact_check")).json(); } catch (e) { j = { ok: false, error: "Could not reach the app server." }; }
+  $("capBtn").disabled = false; CAP = j;
+  if (!j.ok) { $("eegLed").className = "led bad"; $("eegMsg").textContent = j.error; $("capBox").classList.add("hidden"); return; }
+  $("eegLed").className = "led " + (j.ready ? "good" : "bad"); $("eegMsg").innerHTML = `<b>${esc(j.message)}</b>`;
+  const col = { good: "var(--good)", weak: "var(--warn)", bad: "var(--bad)" };
+  $("capSvg").innerHTML = '<ellipse cx="100" cy="100" rx="92" ry="96" fill="var(--surface-2)" stroke="var(--line-2)"/><path d="M90 6l10-9 10 9" fill="none" stroke="var(--line-2)"/>' +
+    j.channels.map(c => { const p = POS[c.name]; if (!p) return ""; const key = ["Fz", "Cz", "Pz", "P3", "P4"].includes(c.name);
+      return `<g><title>${c.name}: ${c.uv} µV ${c.why}</title><circle cx="${p[0]}" cy="${p[1]}" r="11" fill="${col[c.state]}" ${key ? 'stroke="var(--ink)" stroke-width="2"' : ""}/><text x="${p[0]}" y="${p[1] + 3.5}" text-anchor="middle" font-size="8.5" font-weight="600" fill="#fff">${c.name}</text></g>`; }).join("");
+  const bad = j.channels.filter(c => c.state === "bad");
+  $("capList").innerHTML = `<div><span class="badge good">good</span> <span class="badge warn">weak</span> <span class="badge bad">no contact / noisy</span></div>
+    <div style="margin-top:8px">Outlined electrodes matter most: <b>Fz, Cz</b> and one of <b>Pz, P3, P4</b>.</div>
+    ${bad.length ? `<div style="margin-top:8px">Re-seat: ${bad.map(c => `<b>${c.name}</b>`).join(", ")}</div>` : ""}
+    <div class="muted" style="margin-top:8px">Dry electrodes settle for 2–3 minutes; check again before starting.</div>`;
+  $("capBox").classList.remove("hidden"); $("capBox").style.display = "flex";
+};
+
+// ------------------------------------------------------------------ analyse + view results
+const resultsUrl = (pid, ads) => `/results?session=${encodeURIComponent(pid)}` + (ads && ads.length ? `&ad=${encodeURIComponent(ads[0])}` : "");
+async function analyse(pid) {
+  const r = await fetch(`/api/process/${encodeURIComponent(pid)}`, { method: "POST" });
+  const j = await r.json();
+  if (!j.ok) { alert(j.error); return; }
+  pollProc();
+}
+let procTimer = null;
+async function pollProc() {
+  clearTimeout(procTimer);
+  const s = await (await fetch("/api/process/status")).json();
+  if (s.state === "idle") return;
+  const pid = s.participant_id, rb = $("resultBox");
+  const html = s.state === "running"
+    ? `<div class="txt"><b><span class="spin"></span>Analysing ${esc(pid)}…</b><span>${esc((s.log || []).slice(-1)[0] || "Cleaning the signal and computing scene values")}</span></div><button class="btn sm danger" data-stopproc>Stop</button>`
+    : s.state === "finished"
+    ? `<div class="txt"><b>${esc(pid)} is ready.</b><span>${s.ads.length} ad${s.ads.length === 1 ? "" : "s"} analysed: ${s.ads.map(esc).join(", ")}</span></div><a class="btn good lg" href="${resultsUrl(pid, s.ads)}">View ${esc(pid)}'s results →</a>`
+    : `<div class="txt"><b>Analysis failed for ${esc(pid)}.</b><span>${esc((s.log || []).slice(-2).join(" · "))}</span></div><button class="btn" data-analyse="${esc(pid)}">Try again</button>`;
+  if (rb.dataset.pid === pid) { rb.className = "result " + (s.state === "finished" ? "done" : s.state === "failed" ? "fail" : ""); rb.innerHTML = html; }
+  loadViewers(pid, s);
+  if (s.state === "running") procTimer = setTimeout(pollProc, 2000);
+}
+async function loadViewers(activePid, st) {
+  const list = await (await fetch("/api/sessions")).json();
+  const real = list.filter(v => !/^zz_|^e2e/.test(v.session));
+  $("viewers").innerHTML = real.length ? real.map(v => {
+    const busy = st && st.state === "running" && st.participant_id === v.session;
+    const exb = `<button class="btn sm ghost" data-excl="${esc(v.session)}" data-on="${v.excluded ? 0 : 1}" title="Excluded viewers are left out of every result">${v.excluded ? "Include" : "Exclude"}</button>`;
+    const action = busy ? `<span class="small"><span class="spin"></span>analysing…</span><button class="btn sm danger" data-stopproc>Stop</button>`
+      : v.excluded ? exb
+      : v.processed && v.has_baseline === false ? `<span class="small muted">can't be scored</span>`
+      : v.processed && v.ads.length ? `<button class="btn sm ghost" data-analyse="${esc(v.session)}" title="Re-run the analysis">Re-analyse</button><a class="btn sm primary" href="${resultsUrl(v.session, v.ads)}">View results</a>${exb}`
+      : `<button class="btn sm primary" data-analyse="${esc(v.session)}">Analyse</button>${exb}`;
+    const info = v.processed ? (v.ads.length ? `${v.ads.length} ad${v.ads.length === 1 ? "" : "s"}: ${v.ads.map(esc).join(", ")}` : (v.has_baseline === false ? "no resting baseline — can't be scored" : "no ads analysed"))
+      : "recorded, not analysed yet";
+    const badge = v.excluded ? '<span class="badge bad">excluded</span>' : !v.processed ? '<span class="badge warn">new</span>' : v.has_baseline === false ? '<span class="badge">no baseline</span>' : '<span class="badge good">analysed</span>';
+    return `<div class="vrow"><span class="id">${esc(v.session)}</span><span class="info">${info}</span>${badge}<span class="row" style="gap:6px">${action}</span></div>`;
+  }).join("") : '<div class="empty">No recordings yet.</div>';
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-analyse]"); if (b) return analyse(b.dataset.analyse);
+  if (e.target.closest("[data-stopproc]")) { await fetch("/api/process/stop", { method: "POST" }); return pollProc(); }
+  const x = e.target.closest("[data-excl]");
+  if (x) { await fetch(`/api/viewer/${encodeURIComponent(x.dataset.excl)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ excluded: x.dataset.on === "1" }) }); loadViewers(); }
+});
+async function load(keep) {
+  const j = await (await fetch("/api/setup")).json();
+  ADS = j.ads; BANK = j.bank; DEFAULTS = j.default_questions; SESSIONS = j.sessions;
+  if (!keep) { rows = ADS.map(a => ({ file: a.file, include: true, questions: new Set(a.recall_ready ? [...DEFAULTS, "brand_recall"] : DEFAULTS) })); $("pid").value = nextId(); }
+  else ADS.forEach(a => { if (!rows.find(r => r.file === a.file)) rows.push({ file: a.file, include: false, questions: new Set(DEFAULTS) }); });
+  renderAds();
+  if (j.run && j.run.state !== "idle") { showRun(j.run); if (j.run.state === "running") poll(); }
+  loadViewers(); pollProc(); if (!LABELLING) labelStatus();
+}
+load(false);
+</script>
+</body>
+</html>

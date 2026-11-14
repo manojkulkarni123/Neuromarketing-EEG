@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ads · Ad Copilot</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/shell.js"></script>
+<style>
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; }
+.ad { overflow: hidden; display: flex; flex-direction: column; }
+.ad .im { position: relative; }
+.ad img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; background: #000; }
+.ad .dur { position: absolute; right: 8px; bottom: 8px; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 99px; background: rgba(0, 0, 0, .65); color: #fff; }
+.ad .bd { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.ad .ttl { font-weight: 600; font-size: 14px; }
+.ad .meta { display: flex; gap: 6px; flex-wrap: wrap; }
+.ad .acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; padding-top: 6px; }
+.prog { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.prog .row1 { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; }
+.prog .bar { height: 6px; border-radius: 99px; background: var(--surface-3); overflow: hidden; }
+.prog .bar i { display: block; height: 100%; background: var(--accent); border-radius: 99px; transition: width .4s ease; }
+.prog .sub { font-size: 11.5px; color: var(--muted); }
+.banner.live { position: sticky; top: 8px; z-index: 20; box-shadow: var(--shadow-lg); }
+.banner { padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--accent); border-right-color: transparent; animation: sp .8s linear infinite; display: inline-block; vertical-align: -2px; }
+@keyframes sp { to { transform: rotate(360deg); } }
+dialog { border: 1px solid var(--line); border-radius: 12px; padding: 0; width: 460px; max-width: 94vw; box-shadow: var(--shadow-lg); color: var(--ink); background: var(--surface); }
+dialog::backdrop { background: rgba(17, 24, 39, .35); }
+dialog .bd { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+dialog label { font-size: 11.5px; color: var(--muted); font-weight: 500; display: block; margin-bottom: 4px; }
+dialog input[type=text] { width: 100%; }
+dialog .ft { padding: 12px 16px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 8px; }
+</style>
+</head>
+<body>
+<div class="pagehead">
+  <h1>Ads</h1><span class="sub" id="sub"></span><span class="spacer"></span>
+  <input type="file" id="file" accept="video/mp4,video/quicktime,video/webm" class="hidden">
+  <button class="btn primary" id="addBtn">Add a video</button>
+</div>
+<div class="page">
+  <section class="card banner hidden" id="banner"></section>
+  <div class="grid" id="grid"></div>
+</div>
+
+<dialog id="dlg">
+  <div class="card-h"><h2 id="dTitle">Ad details</h2></div>
+  <div class="bd">
+    <div><label for="dBrand">Brand</label><input type="text" id="dBrand" placeholder="e.g. Bosch"></div>
+    <div><label>Brand recall question · three other brands the viewer can choose from</label>
+      <input type="text" id="dO1" placeholder="Other brand 1" style="margin-bottom:6px"><input type="text" id="dO2" placeholder="Other brand 2" style="margin-bottom:6px"><input type="text" id="dO3" placeholder="Other brand 3"></div>
+    <div><label for="dGoal">What is this ad meant to achieve? (optional)</label><input type="text" id="dGoal" placeholder="e.g. make viewers remember the brand"></div>
+    <div class="small muted">Used for the end-of-session question “Which brand was this ad for?”.</div>
+  </div>
+  <div class="ft"><button class="btn" id="dCancel">Cancel</button><button class="btn primary" id="dSave">Save</button></div>
+</dialog>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const fmtDur = s => s == null ? "" : s >= 60 ? `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}` : `${Math.round(s)} s`;
+let ADS = [], VIEWS = {}, timer = null, editing = null;
+async function load() {
+  const [setup, sessions] = await Promise.all([fetch("/api/setup").then(r => r.json()), fetch("/api/sessions").then(r => r.json())]);
+  ADS = setup.ads; VIEWS = {};
+  sessions.filter(v => !v.excluded).forEach(v => v.ads.forEach(a => VIEWS[a] = (VIEWS[a] || 0) + 1));
+  $("sub").textContent = `${ADS.length} videos · ${ADS.filter(a => a.scenes_status === "reviewed").length} approved`;
+  $("grid").innerHTML = ADS.map(a => {
+    const st = a.scenes_status, n = VIEWS[a.ad] || 0;
+    return `<div class="card ad" data-ad="${a.ad}"><div class="im"><img loading="lazy" src="/api/thumb/${a.ad}?t=${((a.duration_s || 10) * .45).toFixed(1)}&w=480" alt=""><span class="dur">${fmtDur(a.duration_s)}</span></div>
+      <div class="bd"><div class="ttl">${esc(a.brand || a.ad)}</div><div class="small muted">${esc(a.ad)}${a.product ? " · " + esc(a.product) : ""}</div>
+        <div class="meta"><span class="badge ${st === "reviewed" ? "good" : st ? "warn" : "bad"}">${st === "reviewed" ? "scenes approved" : st ? "scenes need review" : "not analysed yet"}</span>
+          <span class="badge">${n ? n + " viewer" + (n > 1 ? "s" : "") : "no viewers"}</span>${a.recall_ready ? "" : '<span class="badge warn">no recall options</span>'}</div>
+        <div class="acts">${st ? `<a class="btn sm primary" href="/review?ad=${a.ad}">${st === "reviewed" ? "Edit scenes" : "Review scenes"}</a><a class="btn sm" href="/results?ad=${a.ad}">Results</a>`
+            : `<select data-lang="${a.ad}" class="small" style="padding:4px 6px"><option value="en">English</option><option value="hi">Hindi</option><option value="">Auto</option></select><button class="btn sm primary" data-label="${a.ad}">Analyse with AI</button>`}
+          <button class="btn sm ghost" data-edit="${a.ad}">Details</button>${st ? `<button class="btn sm ghost" data-relabel="${a.ad}" data-st="${st}">Re-analyse</button>` : ""}</div>
+      </div></div>`; }).join("") || '<div class="empty">No videos yet. Press “Add a video”.</div>';
+  paint(LAST);
+}
+// ------------------------------------------------------------ progress on the card itself
+const STEPS = ["Listening to the audio", "Watching the story", "Finding the camera cuts", "Lining up scene edges with the cuts", "Finding the exact brand frames"];
+let LAST = null;
+function stageOf(ad, log) {
+  // the labeller runs: cut detector (2), audio (0), story (1), snap (3), brand frames (4); show the latest step
+  let last = -1, done = false; const seen = new Set();
+  (log || []).forEach(l => { const m = l.startsWith(ad + ": stage ") && l.match(/: stage (\d)/); if (m) { last = +m[1]; seen.add(last); }
+    if (l.startsWith(ad + ":") && /\d+ scenes, \d+ brand events/.test(l)) done = true; });
+  return { st: last, n: seen.size, done };
+}
+function paint(j) {
+  if (!j || j.state !== "running") return;
+  (j.ads || []).forEach(ad => {
+    const card = document.querySelector(`.ad[data-ad="${ad}"] .acts`); if (!card) return;
+    const { st, n, done } = stageOf(ad, j.log), pct = done ? 100 : Math.round(100 * Math.max(0, n - 0.5) / 5);
+    card.innerHTML = `<div class="prog"><div class="row1"><span class="spin"></span>${done ? "Finishing up…" : st < 0 ? "Starting…" : `Step ${n} of 5 · ${STEPS[st]}`}</div>
+      <div class="bar"><i style="width:${st < 0 && !done ? 4 : pct}%"></i></div>
+      <div class="row1" style="font-weight:400"><span class="sub" style="flex:1">About 2 minutes in total · you can leave this page</span><button class="btn sm ghost" data-stop>Stop</button></div></div>`;
+  });
+}
+async function status() {
+  clearTimeout(timer);
+  const j = await fetch("/api/label/status").then(r => r.json()), b = $("banner"); LAST = j;
+  b.classList.toggle("live", j.state === "running");
+  if (j.state === "running") { b.classList.remove("hidden");
+    b.innerHTML = `<span class="spin"></span><b>AI is analysing ${j.ads.map(esc).join(", ")}</b><span class="small muted" style="flex:1">${esc((j.log || []).slice(-1)[0] || "about 2 minutes per ad")}</span><button class="btn sm danger" id="stopLabel">Stop</button>`;
+    $("stopLabel").onclick = async () => { await fetch("/api/label/stop", { method: "POST" }); status(); };
+    paint(j); timer = setTimeout(status, 2500); }
+  else if (j.state === "failed") { b.classList.remove("hidden"); b.innerHTML = `<b style="color:var(--bad)">The AI analysis stopped.</b><span class="small">${(j.log || []).slice(-2).map(esc).join(" · ")}</span>`; load(); }
+  else if (j.state === "finished") { b.classList.remove("hidden"); b.innerHTML = `<b style="color:var(--good)">Analysed ${j.ads.map(esc).join(", ")}.</b><span class="small">Scenes and brand moments are a draft — open “Review scenes” to check them.</span>`; load(); }
+  else b.classList.add("hidden");
+}
+async function label(ads, language, extra) {
+  const r = await fetch("/api/label", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ads, language, ...extra }) }).then(r => r.json());
+  if (!r.ok) return alert(r.error);
+  LAST = { state: "running", ads, log: [] }; paint(LAST); status();
+}
+document.addEventListener("click", async e => {
+  if (e.target.closest("[data-stop]")) { if (confirm("Stop the AI analysis?")) { await fetch("/api/label/stop", { method: "POST" }); status(); } return; }
+  const l = e.target.closest("[data-label]");
+  if (l) { if (confirm(`Analyse ${l.dataset.label} with AI now?\nThis sends frames and audio of the ad to OpenAI and uses credit (a few cents).`)) label([l.dataset.label], document.querySelector(`[data-lang="${l.dataset.label}"]`).value, {}); return; }
+  const r = e.target.closest("[data-relabel]");
+  if (r) { const lang = prompt(`Re-analyse ${r.dataset.relabel} with AI. This REPLACES its current scenes${r.dataset.st === "reviewed" ? " (already approved!)" : ""} and uses credit.\n\nSpoken language code: en, hi, or leave empty for auto`, "en");
+    if (lang !== null) label([r.dataset.relabel], lang.trim(), { overwrite: true, confirm_reviewed: true }); return; }
+  const ed = e.target.closest("[data-edit]");
+  if (ed) { editing = ed.dataset.edit; const p = await fetch(`/api/profile/${editing}`).then(r => r.json());
+    $("dTitle").textContent = `Details · ${editing}`; $("dBrand").value = p.brand || ""; $("dGoal").value = p.goal || "";
+    const others = (p.recall_options || []).filter(o => o !== p.brand); ["dO1", "dO2", "dO3"].forEach((id, k) => $(id).value = others[k] || ""); $("dlg").showModal(); }
+});
+$("dCancel").onclick = () => $("dlg").close();
+$("dSave").onclick = async () => {
+  const brand = $("dBrand").value.trim(); if (!brand) return alert("Enter the brand.");
+  await fetch(`/api/profile/${editing}`, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ brand, recall_options: [brand, $("dO1").value, $("dO2").value, $("dO3").value], goal: $("dGoal").value }) });
+  $("dlg").close(); load();
+};
+$("addBtn").onclick = () => $("file").click();
+$("file").onchange = async () => {
+  const f = $("file").files[0]; if (!f) return;
+  $("addBtn").disabled = true; $("addBtn").textContent = "Uploading…";
+  const r = await fetch(`/api/ads/upload?name=${encodeURIComponent(f.name)}`, { method: "POST", body: f }).then(r => r.json()).catch(() => ({ ok: false, error: "Upload failed." }));
+  $("addBtn").disabled = false; $("addBtn").textContent = "Add a video"; $("file").value = "";
+  if (!r.ok) return alert(r.error);
+  await load(); alert(`Added as ${r.ad}. Next: press “Analyse with AI” on its card.`);
+};
+load(); status();
+</script>
+</body>
+</html>
